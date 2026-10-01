@@ -48,3 +48,7 @@ export const CARE_FIELDS = [
 export function formatDate(d) {
   return new Date(d).toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+export function formatShortDate(d) {
+  return new Date(d).toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+}

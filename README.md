@@ -8,8 +8,13 @@ A mobile-first web app (PWA, Hebrew/RTL) for growing plants at home, on the balc
   nutrients, temperature, humidity, pot/roots), what in the photo points to it, and step-by-step treatment.
 - **Care guide**: light, water, soil, humidity, temperature, fertilizer, repotting, pet toxicity and
   best spot, fitted to the Israeli climate, the current season and where the plant grows.
-- **My plants**: save plants, track watering ("I watered now" plus a next-watering reminder),
-  run follow-up scans and browse each plant's scan history.
+- **My plants**: plant cards with photo, scientific name, site and watering interval, plus a
+  Sites view that groups plants by where they live (living room, balcony, backyard...).
+- **Reminders / task board**: today's and this week's watering and fertilizing tasks with one-tap
+  ✓, a daily summary notification, and a repeating calendar event (.ics) per task for real phone alerts.
+- **Plant journal**: a timeline of waterings, feedings, notes, progress photos and health scans.
+- **Care guide**: general guides (watering, light, fertilizing, pests, repotting, Israeli seasons)
+  plus each saved plant's own guide.
 
 Identification and diagnosis use Claude (vision) on the server. The plant collection
 lives in the browser's localStorage.
@@ -40,7 +45,12 @@ To use the phone camera during development, run `npx vite --host` and open the L
 | `server.js` | Local Express server for `/api` |
 | `src/components/ScanView.jsx` | Camera/gallery → analyze → save |
 | `src/components/ResultView.jsx` | Diagnosis display (ID, health, issues, care guide) |
-| `src/components/PlantList.jsx`, `PlantDetail.jsx` | Collection, watering, history |
+| `src/components/PlantList.jsx` | My plants: plant cards, sites view, add button |
+| `src/components/PlantDetail.jsx` | Plant page: care schedule, journal, health, guide |
+| `src/components/Reminders.jsx` | Task board and notification toggle |
+| `src/components/CareGuides.jsx` | General care guides |
+| `src/lib/storage.js` | Plant storage, care tasks and due dates |
+| `src/lib/reminders.js` | Notifications and calendar (.ics) reminders |
 
 ## Claude artifact version
 

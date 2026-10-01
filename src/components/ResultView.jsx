@@ -20,7 +20,7 @@ export function CareGuide({ care }) {
             <div key={key} className="flex gap-3">
               <span className="text-xl shrink-0">{icon}</span>
               <div>
-                <dt className="text-xs font-bold text-green-800">{label}</dt>
+                <dt className="text-xs font-bold text-forest">{label}</dt>
                 <dd className="text-sm">{care[key]}</dd>
               </div>
             </div>
@@ -31,7 +31,7 @@ export function CareGuide({ care }) {
   )
 }
 
-export default function ResultView({ result }) {
+export default function ResultView({ result, mode = 'diagnose', hideCare = false }) {
   if (!result.is_plant) {
     return (
       <div className="card text-center space-y-2">
@@ -43,6 +43,8 @@ export default function ResultView({ result }) {
   }
 
   const { identification: id, health, issues, care, tips } = result
+
+  const careBlock = hideCare ? null : <CareGuide care={care} />
 
   return (
     <div className="space-y-4">
@@ -60,6 +62,8 @@ export default function ResultView({ result }) {
           <p className="text-xs text-stone-500 mt-2">ייתכן גם: {id.alternatives.join(' · ')}</p>
         )}
       </div>
+
+      {mode === 'identify' && careBlock}
 
       <div className="card">
         <div className="flex items-center justify-between mb-2">
@@ -93,8 +97,8 @@ export default function ResultView({ result }) {
                   <span className="text-xs rounded-full px-2 py-0.5 bg-stone-100">{cat.label}</span>
                 </div>
                 <p className="text-sm text-stone-600 mt-2">🔎 {issue.evidence}</p>
-                <div className="mt-3 bg-green-50 rounded-xl p-3">
-                  <div className="text-xs font-bold text-green-800 mb-1">מה לעשות:</div>
+                <div className="mt-3 bg-mint-50 rounded-2xl p-3">
+                  <div className="text-xs font-bold text-forest mb-1">מה לעשות:</div>
                   <ol className="list-decimal pr-5 text-sm space-y-1">
                     {issue.treatment.map((step, j) => <li key={j}>{step}</li>)}
                   </ol>
@@ -111,7 +115,7 @@ export default function ResultView({ result }) {
         </div>
       )}
 
-      <CareGuide care={care} />
+      {mode !== 'identify' && careBlock}
 
       {tips.length > 0 && (
         <div className="card">
