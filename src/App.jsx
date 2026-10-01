@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import ScanView from './components/ScanView.jsx'
 import PlantList from './components/PlantList.jsx'
 import PlantDetail from './components/PlantDetail.jsx'
 import Reminders from './components/Reminders.jsx'
 import CareGuides from './components/CareGuides.jsx'
-import { BookIcon, ClockIcon, KitIcon, LeafIcon, SearchIcon } from './components/Icons.jsx'
+import Chat from './components/Chat.jsx'
+import { BookIcon, ChatIcon, ClockIcon, KitIcon, LeafIcon, SearchIcon } from './components/Icons.jsx'
 import { allTasks, completeTask, loadPlants, savePlants } from './lib/storage.js'
 import { notifyDueTasks } from './lib/reminders.js'
 
 const TABS = [
   { id: 'reminders', label: 'תזכורות', Icon: ClockIcon, title: 'תזכורות', sub: 'מה הצמחים צריכים היום' },
   { id: 'diagnose', label: 'אבחון', Icon: KitIcon, title: 'אבחון', sub: 'מגלים מה מציק לצמח ואיך מטפלים' },
-  { id: 'identify', label: 'זיהוי צמח', Icon: SearchIcon, title: 'זיהוי צמח', sub: 'צלמו צמח וגלו מה הוא' },
-  { id: 'guide', label: 'מדריך טיפול', Icon: BookIcon, title: 'מדריך טיפול', sub: 'כל מה שצריך לדעת כדי לגדל נכון' },
+  { id: 'identify', label: 'זיהוי', Icon: SearchIcon, title: 'זיהוי צמח', sub: 'צלמו צמח וגלו מה הוא' },
+  { id: 'chat', label: 'מומחה', Icon: ChatIcon, title: 'המומחה לצמחים', sub: 'שאלו כל שאלה על צמחים וגינון' },
+  { id: 'guide', label: 'מדריך', Icon: BookIcon, title: 'מדריך טיפול', sub: 'כל מה שצריך לדעת כדי לגדל נכון' },
   { id: 'plants', label: 'הצמחים שלי', Icon: LeafIcon, title: 'הצמחים שלי', sub: 'שומרים על הצמחים מסודרים ומאושרים' },
 ]
 
@@ -22,6 +24,7 @@ export default function App() {
   const [openId, setOpenId] = useState(null)
   const [rescanId, setRescanId] = useState(null)
   const [storageError, setStorageError] = useState(false)
+  const [chatDraft, setChatDraft] = useState('')
 
   useEffect(() => {
     setStorageError(!savePlants(plants))
@@ -54,6 +57,12 @@ export default function App() {
     setTab('plants')
     setOpenId(id)
     window.scrollTo(0, 0)
+  }
+
+  const clearDraft = useCallback(() => setChatDraft(''), [])
+  const askExpert = plant => {
+    setChatDraft(`לגבי ה${plant.name} שלי: `)
+    goTab('chat')
   }
 
   const current = TABS.find(t => t.id === tab)
@@ -106,6 +115,8 @@ export default function App() {
           />
         )}
 
+        {tab === 'chat' && <Chat plants={plants} draft={chatDraft} onDraftUsed={clearDraft} />}
+
         {tab === 'guide' && <CareGuides plants={plants} onOpenPlant={showPlant} />}
 
         {tab === 'plants' && !openPlant && (
@@ -125,6 +136,7 @@ export default function App() {
             onBack={() => setOpenId(null)}
             onUpdate={fn => updatePlant(openPlant.id, fn)}
             onDelete={() => deletePlant(openPlant.id)}
+            onAsk={() => askExpert(openPlant)}
             onRescan={() => {
               setRescanId(openPlant.id)
               setTab('diagnose')
@@ -135,14 +147,14 @@ export default function App() {
       </main>
 
       <nav className="fixed bottom-0 inset-x-0 z-10 bg-white/95 backdrop-blur border-t border-stone-100 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-w-xl mx-auto grid grid-cols-5">
+        <div className="max-w-xl mx-auto grid grid-cols-6">
           {TABS.map(({ id, label, Icon }) => {
             const active = tab === id
             return (
               <button
                 key={id}
                 onClick={() => goTab(id)}
-                className={`relative pt-2.5 pb-2 flex flex-col items-center gap-1 text-[12px] font-medium ${active ? 'text-mint-500' : 'text-stone-500'}`}
+                className={`relative pt-2.5 pb-2 flex flex-col items-center gap-1 text-[11.5px] font-medium ${active ? 'text-mint-500' : 'text-stone-500'}`}
               >
                 <Icon className="w-7 h-7" strokeWidth={active ? 2.2 : 1.8} />
                 {label}

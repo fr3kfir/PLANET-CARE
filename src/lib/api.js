@@ -9,3 +9,24 @@ export async function diagnose({ dataUrl, location, notes, knownSpecies }) {
   if (!r.ok) throw new Error(body.error || `שגיאת שרת (${r.status})`);
   return body;
 }
+
+// Plant-expert chat: streams the reply text, calling onDelta with each chunk.
+export async function chatStream({ messages, plants, signal, onDelta }) {
+  const r = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, plants }),
+    signal,
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body.error || `שגיאת שרת (${r.status})`);
+  }
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onDelta(decoder.decode(value, { stream: true }));
+  }
+}

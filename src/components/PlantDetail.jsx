@@ -208,7 +208,7 @@ function Journal({ plant, onUpdate }) {
   )
 }
 
-export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan }) {
+export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan, onAsk }) {
   const [tab, setTab] = useState('care')
   const [meter, setMeter] = useState(false)
   const [scanIdx, setScanIdx] = useState(0)
@@ -252,7 +252,10 @@ export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onResca
           <AddTask plant={plant} onUpdate={onUpdate} />
           {care?.water && <p className="text-sm text-stone-500 px-1">💡 {care.water}</p>}
           <LightCard plant={plant} onMeasure={() => setMeter(true)} />
-          <button className="btn-ghost w-full" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקת בריאות חדשה</button>
+          <div className="grid grid-cols-2 gap-2">
+            <button className="btn-ghost" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקה חדשה</button>
+            <button className="btn-ghost" onClick={onAsk}>💬 לשאול את המומחה</button>
+          </div>
           <button
             className="w-full text-sm text-red-600 py-3"
             onClick={() => confirm(`למחוק את "${plant.name}" מהאוסף?`) && onDelete()}

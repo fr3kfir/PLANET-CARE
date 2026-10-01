@@ -4,6 +4,8 @@ A mobile-first web app (PWA, Hebrew/RTL) for growing plants at home, on the balc
 
 - **Live scanner**: full-screen camera with a scan frame, flash toggle and gallery picker, then an
   animated scan (sweeping line, detection points, progress) over the photo while it is analyzed.
+- **Plant expert chat**: ask anything about plants and gardening in Hebrew, attach photos, and get
+  streamed answers that know your plant collection; conversation kept on the device.
 - **Photo → species ID**: common name (Hebrew/English), scientific name, family, confidence and alternatives.
 - **Health scan**: a health score and status, plus each detected problem by category
   (light, over/under-watering, soil/drainage, pests such as aphids/mealybugs/spider mites, disease,
@@ -48,6 +50,7 @@ To use the phone camera during development, run `npx vite --host` and open the L
 |---|---|
 | `api/_lib/diagnose-core.js` | Claude prompt + JSON schema for the diagnosis |
 | `api/diagnose.js` | Vercel function `POST /api/diagnose` |
+| `api/_lib/chat-core.js`, `api/chat.js` | Plant-expert chat prompt and streaming `POST /api/chat` |
 | `server.js` | Local Express server for `/api` |
 | `src/components/ScanView.jsx` | Scan flow: camera → scanning → result → save |
 | `src/components/CameraScanner.jsx`, `ScanningOverlay.jsx` | Live camera viewfinder and scanning animation |
@@ -56,6 +59,7 @@ To use the phone camera during development, run `npx vite --host` and open the L
 | `src/components/PlantDetail.jsx` | Plant page: care schedule, journal, health, guide |
 | `src/components/Reminders.jsx` | Task board and notification toggle |
 | `src/components/CareGuides.jsx` | General care guides |
+| `src/components/Chat.jsx` | Plant-expert chat screen |
 | `src/components/LightMeter.jsx` | Camera light meter |
 | `src/lib/storage.js` | Plant storage, care tasks and due dates |
 | `src/lib/reminders.js` | Notifications and calendar (.ics) reminders |

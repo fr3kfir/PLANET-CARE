@@ -14,6 +14,7 @@ try {
 } catch { /* no .env file */ }
 
 const { getDiagnosisPayload } = await import('./api/_lib/diagnose-core.js');
+const { handleChat } = await import('./api/chat.js');
 
 const app = express();
 app.use(express.json({ limit: '8mb' }));
@@ -22,6 +23,8 @@ app.post('/api/diagnose', async (req, res) => {
   const { status, body } = await getDiagnosisPayload(req.body);
   res.status(status).json(body);
 });
+
+app.post('/api/chat', handleChat);
 
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => console.log(`🌱 plant-care API on http://localhost:${PORT}`));
