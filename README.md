@@ -10,8 +10,12 @@ A mobile-first web app (PWA, Hebrew/RTL) for growing plants at home, on the balc
   best spot, fitted to the Israeli climate, the current season and where the plant grows.
 - **My plants**: plant cards with photo, scientific name, site and watering interval, plus a
   Sites view that groups plants by where they live (living room, balcony, backyard...).
-- **Reminders / task board**: today's and this week's watering and fertilizing tasks with one-tap
+- **Reminders / task board**: today's and this week's watering, fertilizing, misting, pruning and repotting tasks with one-tap
   ✓, a daily summary notification, and a repeating calendar event (.ics) per task for real phone alerts.
+- **Seasonal care plan**: separate warm-season (Apr-Oct) and cool-season (Nov-Mar) intervals per plant,
+  fitted to where it grows; the schedule switches by itself when the season changes.
+- **Light meter**: measures light with the phone camera (lux from the camera's exposure where the
+  browser reports it, otherwise a rough estimate) and says whether the spot suits the plant.
 - **Plant journal**: a timeline of waterings, feedings, notes, progress photos and health scans.
 - **Care guide**: general guides (watering, light, fertilizing, pests, repotting, Israeli seasons)
   plus each saved plant's own guide.
@@ -49,6 +53,7 @@ To use the phone camera during development, run `npx vite --host` and open the L
 | `src/components/PlantDetail.jsx` | Plant page: care schedule, journal, health, guide |
 | `src/components/Reminders.jsx` | Task board and notification toggle |
 | `src/components/CareGuides.jsx` | General care guides |
+| `src/components/LightMeter.jsx` | Camera light meter |
 | `src/lib/storage.js` | Plant storage, care tasks and due dates |
 | `src/lib/reminders.js` | Notifications and calendar (.ics) reminders |
 

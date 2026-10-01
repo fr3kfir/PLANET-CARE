@@ -3,7 +3,7 @@ import ResultView from './ResultView.jsx'
 import { diagnose } from '../lib/api.js'
 import { resizeImage, thumbnailFromDataUrl } from '../lib/image.js'
 import { LOCATIONS } from '../lib/labels.js'
-import { newId } from '../lib/storage.js'
+import { currentSeason, newId, scheduleFromCare } from '../lib/storage.js'
 
 export default function ScanView({ mode = 'diagnose', targetPlant, onSaveNew, onSaveToPlant }) {
   const cameraRef = useRef(null)
@@ -57,11 +57,9 @@ export default function ScanView({ mode = 'diagnose', targetPlant, onSaveNew, on
       name: result.identification.common_name_he,
       location,
       createdAt: scan.date,
-      lastWatered: null,
       site: LOCATIONS.find(l => l.id === location)?.label || 'בבית',
-      waterEveryDays: result.care.water_every_days || null,
-      lastFertilized: null,
-      fertilizeEveryDays: result.care.fertilize_every_days || null,
+      ...scheduleFromCare(result.care),
+      seasonApplied: currentSeason(),
       journal: [],
       scans: [scan],
     })

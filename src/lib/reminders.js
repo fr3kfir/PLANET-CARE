@@ -35,7 +35,7 @@ export function notifyDueTasks(plants) {
   const due = allTasks(plants).filter(t => t.dueInDays <= 0);
   saveReminderSettings({ ...s, lastNotified: today });
   if (!due.length) return;
-  const body = due.slice(0, 5).map(t => `${TASKS[t.type].icon} ${TASKS[t.type].verb} את ${t.plant.name}`).join('\n');
+  const body = due.slice(0, 5).map(t => `${TASKS[t.type].icon} ${TASKS[t.type].task(t.plant.name)}`).join('\n');
   try {
     new Notification(`צמחייה · ${due.length} משימות להיום`, { body, icon: '/icon.svg', lang: 'he', dir: 'rtl' });
   } catch { /* some mobile browsers only allow notifications from a service worker */ }
@@ -55,7 +55,7 @@ export function downloadTaskIcs(plant, type, hour = loadReminderSettings().hour)
   if (start < new Date()) start.setTime(Date.now());
   start.setHours(hour, 0, 0, 0);
   const end = new Date(start.getTime() + 15 * 60 * 1000);
-  const summary = `${t.icon} ${t.verb} את ${plant.name}`;
+  const summary = `${t.icon} ${t.task(plant.name)}`;
 
   const ics = [
     'BEGIN:VCALENDAR',

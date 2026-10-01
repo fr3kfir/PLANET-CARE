@@ -2,7 +2,8 @@ import { useRef, useState } from 'react'
 import ResultView, { CareGuide, HealthBadge } from './ResultView.jsx'
 import { BackIcon, CalendarIcon, CameraIcon, CheckIcon, PinIcon } from './Icons.jsx'
 import { formatDate, formatShortDate } from '../lib/labels.js'
-import { TASKS, completeTask, dueLabel, newId, plantPhoto, taskStatus } from '../lib/storage.js'
+import { SEASON_LABEL, TASKS, applySeasonPlan, completeTask, currentSeason, dueLabel, newId, plantPhoto, taskStatus } from '../lib/storage.js'
+import LightMeter, { LIGHT_LEVELS } from './LightMeter.jsx'
 import { downloadTaskIcs } from '../lib/reminders.js'
 import { resizeImage, thumbnailFromDataUrl } from '../lib/image.js'
 
@@ -46,6 +47,9 @@ function TaskCard({ plant, type, onUpdate }) {
           className="w-16 border border-stone-200 rounded-xl px-2 py-1.5 text-center"
         />
         <span>ימים</span>
+        {!['water', 'fertilize'].includes(type) && (
+          <button onClick={() => onUpdate(p => ({ ...p, [t.every]: null }))} className="text-stone-400 underline">הסרה</button>
+        )}
         {st && (
           <button onClick={() => downloadTaskIcs(plant, type)} className="mr-auto flex items-center gap-1.5 text-mint-600 font-bold">
             <CalendarIcon className="w-4 h-4" /> הוסף ליומן
@@ -56,9 +60,83 @@ function TaskCard({ plant, type, onUpdate }) {
   )
 }
 
+// Optional tasks the plant doesn't have yet, with a sensible default interval.
+function AddTask({ plant, onUpdate }) {
+  const care = plant.scans[0]?.result?.care
+  const DEFAULTS = { mist: 3, prune: 60, repot: 365 }
+  const missing = Object.keys(DEFAULTS).filter(type => !plant[TASKS[type].every])
+  if (!missing.length) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-1">
+      <span className="text-sm text-stone-500">הוספת תזכורת:</span>
+      {missing.map(type => (
+        <button
+          key={type}
+          onClick={() => onUpdate(p => ({ ...p, [TASKS[type].every]: care?.[TASKS[type].care] || DEFAULTS[type], [TASKS[type].last]: p[TASKS[type].last] || new Date().toISOString() }))}
+          className="rounded-full border border-mint-200 bg-white px-3 py-1.5 text-sm font-bold text-forest"
+        >
+          + {TASKS[type].icon} {TASKS[type].label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SeasonPlan({ plant, onUpdate }) {
+  const plan = plant.scans[0]?.result?.care?.seasonal_plan
+  if (!plan) return null
+  const season = currentSeason()
+  const auto = plant.autoSeason !== false
+  const row = s => ['water', 'fertilize', 'mist']
+    .filter(type => plan[s][TASKS[type].care])
+    .map(type => `${TASKS[type].icon} כל ${plan[s][TASKS[type].care]}`)
+    .join('  ·  ') || '—'
+  return (
+    <div className="card bg-gradient-to-l from-mint-50 to-white space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="font-extrabold text-forest">🗓️ תוכנית טיפול עונתית</div>
+          <div className="text-xs text-stone-500">מותאמת ל{plant.site} ולאקלים בישראל</div>
+        </div>
+        <button
+          role="switch"
+          aria-checked={auto}
+          aria-label="עדכון אוטומטי לפי עונה"
+          onClick={() => onUpdate(p => (auto ? { ...p, autoSeason: false } : applySeasonPlan({ ...p, autoSeason: true, seasonApplied: null })))}
+          className={`shrink-0 w-12 h-7 rounded-full p-0.5 transition ${auto ? 'bg-mint-500' : 'bg-stone-200'}`}
+        >
+          <span className={`block w-6 h-6 rounded-full bg-white shadow transition ${auto ? '-translate-x-5' : ''}`} />
+        </button>
+      </div>
+      {['warm', 'cool'].map(s => (
+        <div key={s} className={`rounded-2xl px-3 py-2 text-sm ${s === season ? 'bg-white border border-mint-200' : 'text-stone-500'}`}>
+          <div className="font-bold">{s === 'warm' ? '☀️' : '❄️'} {SEASON_LABEL[s]}{s === season && ' · עכשיו'}</div>
+          <div>{row(s)} ימים</div>
+        </div>
+      ))}
+      <p className="text-xs text-stone-500">{auto ? 'הלוח מתעדכן לבד כשמתחלפת העונה.' : 'עדכון אוטומטי כבוי — הלוח נשאר כפי שקבעתם.'}</p>
+    </div>
+  )
+}
+
+function LightCard({ plant, onMeasure }) {
+  const care = plant.scans[0]?.result?.care
+  const need = LIGHT_LEVELS.find(l => l.id === care?.light_level)
+  return (
+    <div className="card flex items-center gap-3">
+      <span className="w-11 h-11 rounded-2xl grid place-items-center text-xl shrink-0 bg-amber-50">☀️</span>
+      <div className="flex-1 min-w-0">
+        <div className="font-extrabold text-stone-900">אור{need && `: ${need.label}`}</div>
+        <div className="text-sm text-stone-500 line-clamp-2">{need?.hint || care?.light || 'בדקו אם המקום מואר מספיק'}</div>
+      </div>
+      <button onClick={onMeasure} className="shrink-0 rounded-2xl bg-amber-400 text-stone-900 font-bold px-3 py-2 text-sm">מד אור</button>
+    </div>
+  )
+}
+
 const ENTRY = {
-  water: { icon: '💧', text: 'הושקה' },
-  fertilize: { icon: '🧪', text: 'דושן' },
+  ...Object.fromEntries(Object.entries(TASKS).map(([k, t]) => [k, { icon: t.icon, text: t.done }])),
+  season: { icon: '🗓️' },
   note: { icon: '📝' },
   photo: { icon: '📸' },
   scan: { icon: '🩺' },
@@ -132,6 +210,7 @@ function Journal({ plant, onUpdate }) {
 
 export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan }) {
   const [tab, setTab] = useState('care')
+  const [meter, setMeter] = useState(false)
   const [scanIdx, setScanIdx] = useState(0)
   const scan = plant.scans[scanIdx] || plant.scans[0]
   const care = plant.scans[0]?.result?.care
@@ -166,9 +245,13 @@ export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onResca
 
       {tab === 'care' && (
         <div className="space-y-3">
-          <TaskCard plant={plant} type="water" onUpdate={onUpdate} />
-          <TaskCard plant={plant} type="fertilize" onUpdate={onUpdate} />
+          <SeasonPlan plant={plant} onUpdate={onUpdate} />
+          {Object.keys(TASKS).filter(type => ['water', 'fertilize'].includes(type) || plant[TASKS[type].every]).map(type => (
+            <TaskCard key={type} plant={plant} type={type} onUpdate={onUpdate} />
+          ))}
+          <AddTask plant={plant} onUpdate={onUpdate} />
           {care?.water && <p className="text-sm text-stone-500 px-1">💡 {care.water}</p>}
+          <LightCard plant={plant} onMeasure={() => setMeter(true)} />
           <button className="btn-ghost w-full" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקת בריאות חדשה</button>
           <button
             className="w-full text-sm text-red-600 py-3"
@@ -208,6 +291,8 @@ export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onResca
           )}
         </div>
       )}
+
+      {meter && <LightMeter plant={plant} onClose={() => setMeter(false)} />}
 
       {tab === 'guide' && (care ? <CareGuide care={care} /> : <p className="text-center text-sm text-stone-500">אין עדיין מדריך לצמח הזה.</p>)}
     </div>

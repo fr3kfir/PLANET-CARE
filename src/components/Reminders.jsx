@@ -16,7 +16,7 @@ function TaskRow({ task, onDone, onOpen }) {
           <span className={`absolute -bottom-1 -left-1 w-7 h-7 rounded-full grid place-items-center text-sm ring-2 ring-white ${t.color}`}>{t.icon}</span>
         </div>
         <div className="min-w-0">
-          <div className="font-extrabold text-stone-900 truncate">{t.verb} את {task.plant.name}</div>
+          <div className="font-extrabold text-stone-900 truncate">{t.task(task.plant.name)}</div>
           <div className="text-sm text-stone-500 truncate">{task.plant.site} · כל {task.every} ימים</div>
           <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${late ? 'bg-red-50 text-red-600' : task.dueInDays === 0 ? 'bg-mint-50 text-mint-600' : 'bg-stone-100 text-stone-600'}`}>
             {dueLabel(task.dueInDays)}

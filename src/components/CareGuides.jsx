@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SearchIcon } from './Icons.jsx'
+import LightMeter from './LightMeter.jsx'
 import { plantPhoto } from '../lib/storage.js'
 
 const GUIDES = [
@@ -74,6 +75,7 @@ const GUIDES = [
 export default function CareGuides({ plants, onOpenPlant }) {
   const [open, setOpen] = useState(null)
   const [q, setQ] = useState('')
+  const [meter, setMeter] = useState(false)
 
   const guide = GUIDES.find(g => g.id === open)
   if (guide) {
@@ -107,6 +109,16 @@ export default function CareGuides({ plants, onOpenPlant }) {
         <SearchIcon className="w-5 h-5 text-stone-400" />
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש: השקיה, כנימות, דישון..." className="flex-1 outline-none bg-transparent" />
       </label>
+
+      {meter && <LightMeter onClose={() => setMeter(false)} />}
+
+      <button onClick={() => setMeter(true)} className="card w-full flex items-center gap-4 text-right bg-gradient-to-l from-amber-50 to-white">
+        <span className="w-14 h-14 rounded-2xl bg-amber-400 grid place-items-center text-3xl shrink-0">☀️</span>
+        <span className="flex-1">
+          <span className="block text-lg font-extrabold text-stone-900">מד אור</span>
+          <span className="block text-sm text-stone-500">מודדים במצלמה כמה אור יש במקום ובודקים אם הוא מתאים לצמח</span>
+        </span>
+      </button>
 
       <div className="grid grid-cols-2 gap-3">
         {guides.map(g => (

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CanIcon, DotsIcon, PinIcon, PlusPlantIcon } from './Icons.jsx'
-import { plantPhoto, taskStatus } from '../lib/storage.js'
+import { TASKS, allTasks, plantPhoto, taskStatus } from '../lib/storage.js'
 
 export function WaterBadge({ plant }) {
   const w = taskStatus(plant, 'water')
@@ -100,6 +100,8 @@ export default function PlantList({ plants, onOpen, onScan, onUpdate, onDelete }
         <div className="grid grid-cols-2 gap-3">
           {sites.map(s => {
             const inSite = plants.filter(p => p.site === s)
+            const due = allTasks(inSite).filter(t => t.dueInDays <= 0)
+            const byType = Object.keys(TASKS).map(type => [type, due.filter(t => t.type === type).length]).filter(([, n]) => n)
             return (
               <button key={s} onClick={() => { setSite(s); setView('plants') }} className="card p-3 text-right">
                 <div className="grid grid-cols-2 grid-rows-2 gap-1 rounded-2xl overflow-hidden aspect-square bg-mint-50">
@@ -109,7 +111,17 @@ export default function PlantList({ plants, onOpen, onScan, onUpdate, onDelete }
                   })}
                 </div>
                 <div className="mt-2 font-extrabold text-stone-900 flex items-center gap-1.5"><PinIcon className="w-4 h-4 text-mint-500" />{s}</div>
-                <div className="text-sm text-stone-500">{inSite.length} צמחים</div>
+                <div className="text-sm text-stone-500">{inSite.length === 1 ? 'צמח אחד' : `${inSite.length} צמחים`}</div>
+                <div className={`mt-1.5 text-xs font-bold ${due.length ? 'text-mint-600' : 'text-stone-400'}`}>
+                  {due.length ? `${due.length} משימות היום` : '✓ אין משימות היום'}
+                </div>
+                {byType.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {byType.map(([type, n]) => (
+                      <span key={type} className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${TASKS[type].color}`}>{TASKS[type].icon} {n}</span>
+                    ))}
+                  </div>
+                )}
               </button>
             )
           })}
