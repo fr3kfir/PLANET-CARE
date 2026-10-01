@@ -2,6 +2,8 @@
 
 A mobile-first web app (PWA, Hebrew/RTL) for growing plants at home, on the balcony and in the garden:
 
+- **Live scanner**: full-screen camera with a scan frame, flash toggle and gallery picker, then an
+  animated scan (sweeping line, detection points, progress) over the photo while it is analyzed.
 - **Photo → species ID**: common name (Hebrew/English), scientific name, family, confidence and alternatives.
 - **Health scan**: a health score and status, plus each detected problem by category
   (light, over/under-watering, soil/drainage, pests such as aphids/mealybugs/spider mites, disease,
@@ -47,7 +49,8 @@ To use the phone camera during development, run `npx vite --host` and open the L
 | `api/_lib/diagnose-core.js` | Claude prompt + JSON schema for the diagnosis |
 | `api/diagnose.js` | Vercel function `POST /api/diagnose` |
 | `server.js` | Local Express server for `/api` |
-| `src/components/ScanView.jsx` | Camera/gallery → analyze → save |
+| `src/components/ScanView.jsx` | Scan flow: camera → scanning → result → save |
+| `src/components/CameraScanner.jsx`, `ScanningOverlay.jsx` | Live camera viewfinder and scanning animation |
 | `src/components/ResultView.jsx` | Diagnosis display (ID, health, issues, care guide) |
 | `src/components/PlantList.jsx` | My plants: plant cards, sites view, add button |
 | `src/components/PlantDetail.jsx` | Plant page: care schedule, journal, health, guide |
