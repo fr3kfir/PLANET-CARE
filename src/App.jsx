@@ -5,9 +5,11 @@ import PlantDetail from './components/PlantDetail.jsx'
 import Reminders from './components/Reminders.jsx'
 import CareGuides from './components/CareGuides.jsx'
 import Chat from './components/Chat.jsx'
+import AccountSheet, { LoginPrompt } from './components/Account.jsx'
 import { BookIcon, ChatIcon, ClockIcon, KitIcon, LeafIcon, SearchIcon } from './components/Icons.jsx'
 import { allTasks, completeTask, loadPlants, savePlants } from './lib/storage.js'
 import { notifyDueTasks } from './lib/reminders.js'
+import { useCloudSync } from './lib/useCloudSync.js'
 
 const TABS = [
   { id: 'reminders', label: 'תזכורות', Icon: ClockIcon, title: 'תזכורות', sub: 'מה הצמחים צריכים היום' },
@@ -25,6 +27,10 @@ export default function App() {
   const [rescanId, setRescanId] = useState(null)
   const [storageError, setStorageError] = useState(false)
   const [chatDraft, setChatDraft] = useState('')
+  const [accountOpen, setAccountOpen] = useState(false)
+  const { account, status: syncStatus, login, logout } = useCloudSync(plants, setPlants)
+  // When the server has accounts, scanning and chat need a signed-in user.
+  const locked = account.cloud && !account.user
 
   useEffect(() => {
     setStorageError(!savePlants(plants))
@@ -38,7 +44,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const updatePlant = (id, fn) => setPlants(ps => ps.map(p => (p.id === id ? fn(p) : p)))
+  const updatePlant = (id, fn) => setPlants(ps => ps.map(p => (p.id === id ? { ...fn(p), updatedAt: new Date().toISOString() } : p)))
   const deletePlant = id => {
     setPlants(ps => ps.filter(p => p.id !== id))
     setOpenId(null)
@@ -77,7 +83,18 @@ export default function App() {
               <h1 className="page-title">{rescanPlant ? `סריקת מעקב` : current.title}</h1>
               <p className="page-sub">{rescanPlant ? rescanPlant.name : current.sub}</p>
             </div>
-            <img src="/icon.svg" alt="צמחייה" className="w-11 h-11 mt-1" />
+            <button onClick={() => setAccountOpen(true)} aria-label="החשבון שלי" className="relative mt-1 shrink-0">
+              {account.user ? (
+                <span className="w-11 h-11 rounded-full bg-mint-500 text-white grid place-items-center text-lg font-extrabold shadow">
+                  {account.user.email[0].toUpperCase()}
+                </span>
+              ) : (
+                <img src="/icon.svg" alt="" className="w-11 h-11" />
+              )}
+              {account.user && (
+                <span className={`absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full ring-2 ring-white ${syncStatus === 'error' ? 'bg-amber-400' : syncStatus === 'syncing' ? 'bg-sky-400 animate-pulse' : 'bg-mint-500'}`} />
+              )}
+            </button>
           </div>
         </header>
       )}
@@ -98,13 +115,17 @@ export default function App() {
           />
         )}
 
-        {(tab === 'diagnose' || tab === 'identify') && (
+        {locked && (tab === 'diagnose' || tab === 'identify' || tab === 'chat') && (
+          <LoginPrompt account={account} onLogin={login} what={tab === 'chat' ? 'לשוחח עם המומחה' : 'לסרוק צמחים'} />
+        )}
+
+        {!locked && (tab === 'diagnose' || tab === 'identify') && (
           <ScanView
             key={`${tab}-${rescanId || 'new'}`}
             mode={tab}
             targetPlant={rescanPlant}
             onSaveNew={plant => {
-              setPlants(ps => [plant, ...ps])
+              setPlants(ps => [{ ...plant, updatedAt: plant.createdAt }, ...ps])
               showPlant(plant.id)
             }}
             onSaveToPlant={(id, scan) => {
@@ -115,7 +136,7 @@ export default function App() {
           />
         )}
 
-        {tab === 'chat' && <Chat plants={plants} draft={chatDraft} onDraftUsed={clearDraft} />}
+        {!locked && tab === 'chat' && <Chat plants={plants} draft={chatDraft} onDraftUsed={clearDraft} />}
 
         {tab === 'guide' && <CareGuides plants={plants} onOpenPlant={showPlant} />}
 
@@ -145,6 +166,20 @@ export default function App() {
           />
         )}
       </main>
+
+      {accountOpen && (
+        <AccountSheet
+          account={account}
+          status={syncStatus}
+          plantsCount={plants.length}
+          onLogin={async (action, form) => {
+            await login(action, form)
+            setAccountOpen(false)
+          }}
+          onLogout={logout}
+          onClose={() => setAccountOpen(false)}
+        />
+      )}
 
       <nav className="fixed bottom-0 inset-x-0 z-10 bg-white/95 backdrop-blur border-t border-stone-100 pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-xl mx-auto grid grid-cols-6">

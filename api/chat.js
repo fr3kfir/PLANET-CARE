@@ -3,6 +3,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { streamChat, validateChatBody } from './_lib/chat-core.js';
+import { checkAiAccess } from './_lib/store.js';
 
 export async function handleChat(req, res) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -10,6 +11,11 @@ export async function handleChat(req, res) {
   }
   const input = validateChatBody(req.body);
   if (input.error) return res.status(400).json({ error: input.error });
+  const denied = await checkAiAccess(req, 'chat').catch(err => {
+    console.error('quota check failed:', err.message);
+    return { status: 503, error: 'שירות החשבונות לא זמין כרגע' };
+  });
+  if (denied) return res.status(denied.status).json({ error: denied.error });
 
   let started = false;
   try {

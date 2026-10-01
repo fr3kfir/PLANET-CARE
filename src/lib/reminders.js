@@ -37,7 +37,7 @@ export function notifyDueTasks(plants) {
   if (!due.length) return;
   const body = due.slice(0, 5).map(t => `${TASKS[t.type].icon} ${TASKS[t.type].task(t.plant.name)}`).join('\n');
   try {
-    new Notification(`צמחייה · ${due.length} משימות להיום`, { body, icon: '/icon.svg', lang: 'he', dir: 'rtl' });
+    new Notification(`צמחייה · ${due.length} משימות להיום`, { body, icon: '/icon-192.png', lang: 'he', dir: 'rtl' });
   } catch { /* some mobile browsers only allow notifications from a service worker */ }
 }
 

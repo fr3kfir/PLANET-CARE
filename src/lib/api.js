@@ -1,8 +1,10 @@
+import { authHeaders } from './cloud.js';
+
 export async function diagnose({ dataUrl, location, notes, knownSpecies }) {
   const [, mediaType, image] = dataUrl.match(/^data:(image\/[\w+]+);base64,(.*)$/) || [];
   const r = await fetch('/api/diagnose', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ image, mediaType, location, notes, knownSpecies }),
   });
   const body = await r.json().catch(() => ({}));
@@ -14,7 +16,7 @@ export async function diagnose({ dataUrl, location, notes, knownSpecies }) {
 export async function chatStream({ messages, plants, signal, onDelta }) {
   const r = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ messages, plants }),
     signal,
   });

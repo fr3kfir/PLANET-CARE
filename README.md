@@ -25,7 +25,7 @@ A mobile-first web app (PWA, Hebrew/RTL) for growing plants at home, on the balc
   plus each saved plant's own guide.
 
 Identification and diagnosis use Claude (vision) on the server. The plant collection
-lives in the browser's localStorage.
+lives in the browser's localStorage and, when signed in, is synced to the cloud.
 
 ## Run locally
 
@@ -44,6 +44,27 @@ To use the phone camera during development, run `npx vite --host` and open the L
 2. Settings → Environment Variables → add `ANTHROPIC_API_KEY`.
 3. Deploy, then on your phone use "Add to Home Screen" to install it as an app.
 
+## Accounts and cloud storage (recommended)
+
+Without a database the app runs in local-only mode: plants stay in the browser and the AI
+endpoints are open to anyone who has the URL. Connecting Upstash Redis turns on:
+
+- **Accounts** (email + password) and **cloud sync** of the plant collection across devices.
+- **API protection**: scanning and chat require a signed-in user, with daily limits per user
+  and for the whole app, and login attempts are rate-limited.
+
+Setup in Vercel: project → **Storage** → **Create Database** → **Upstash (Redis)** → connect it to
+the project (this adds `KV_REST_API_URL` / `KV_REST_API_TOKEN`), then redeploy.
+
+Optional environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SIGNUP_CODE` | none | If set, creating an account requires this code (keeps strangers out). |
+| `DAILY_SCANS_PER_USER` | 40 | Scans per user per day. |
+| `DAILY_CHATS_PER_USER` | 150 | Chat messages per user per day. |
+| `DAILY_AI_LIMIT` | 600 | Scans + chat messages for the whole app per day. |
+
 ## Structure
 
 | Path | Purpose |
@@ -51,6 +72,8 @@ To use the phone camera during development, run `npx vite --host` and open the L
 | `api/_lib/diagnose-core.js` | Claude prompt + JSON schema for the diagnosis |
 | `api/diagnose.js` | Vercel function `POST /api/diagnose` |
 | `api/_lib/chat-core.js`, `api/chat.js` | Plant-expert chat prompt and streaming `POST /api/chat` |
+| `api/_lib/store.js` | Redis connection, accounts, sessions and daily AI quotas |
+| `api/auth.js`, `api/sync.js` | Sign up / sign in / sign out, and cloud copy of the plant collection |
 | `server.js` | Local Express server for `/api` |
 | `src/components/ScanView.jsx` | Scan flow: camera → scanning → result → save |
 | `src/components/CameraScanner.jsx`, `ScanningOverlay.jsx` | Live camera viewfinder and scanning animation |
@@ -60,6 +83,7 @@ To use the phone camera during development, run `npx vite --host` and open the L
 | `src/components/Reminders.jsx` | Task board and notification toggle |
 | `src/components/CareGuides.jsx` | General care guides |
 | `src/components/Chat.jsx` | Plant-expert chat screen |
+| `src/components/Account.jsx`, `src/lib/cloud.js`, `src/lib/useCloudSync.js` | Account screen and background sync |
 | `src/components/LightMeter.jsx` | Camera light meter |
 | `src/lib/storage.js` | Plant storage, care tasks and due dates |
 | `src/lib/reminders.js` | Notifications and calendar (.ics) reminders |
