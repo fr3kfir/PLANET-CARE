@@ -4,6 +4,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { ARTICLES } from '../../src/lib/articles.js';
 import { createWithFallback } from './diagnose-core.js';
+import { MISSING_KEY_ERROR, anthropicClient } from './anthropic-key.js';
 
 const ARTICLE_IDS = ARTICLES.map(a => a.id);
 
@@ -64,14 +65,14 @@ function describePlant(p) {
 }
 
 export async function getTipsPayload(body) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return { status: 503, body: { error: 'ANTHROPIC_API_KEY is not configured on the server' } };
+  if (!anthropicClient()) {
+    return { status: 503, body: { error: MISSING_KEY_ERROR } };
   }
   const plant = body?.plant;
   if (!plant || typeof plant.name !== 'string') return { status: 400, body: { error: 'plant is required' } };
 
   try {
-    const anthropic = new Anthropic();
+    const anthropic = anthropicClient();
     const response = await createWithFallback(anthropic, {
       model: 'claude-opus-5-5',
       max_tokens: 16000,

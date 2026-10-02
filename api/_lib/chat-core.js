@@ -2,6 +2,7 @@
 // Shared by the Vercel function (api/chat.js) and the local Express server.
 
 import Anthropic from '@anthropic-ai/sdk';
+import { anthropicClient } from './anthropic-key.js';
 
 const SYSTEM_PROMPT = `You are "המומחה לצמחים", a warm, practical plant expert inside a Hebrew plant-care app for home growers in Israel. You know houseplants, balcony and garden plants, herbs, vegetables, fruit trees, succulents, lawns, propagation, pests and diseases, soil and fertilizers, irrigation, garden design and the Israeli climate and seasons.
 
@@ -74,7 +75,7 @@ export function validateChatBody(body) {
 
 // Streams the reply text through write(chunk). Resolves when done.
 export async function streamChat({ messages, plants }, write) {
-  const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
+  const anthropic = anthropicClient();
 
   const params = {
     model: 'claude-opus-5-5',

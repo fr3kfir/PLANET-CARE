@@ -28,6 +28,7 @@ app.post('/api/chat', handleChat);
 app.all('/api/auth', handleAuth);
 app.all('/api/sync', handleSync);
 app.post('/api/tips', handleTips);
+app.get('/api/health', (await import('./api/health.js')).default);
 
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => console.log(`🌱 plant-care API on http://localhost:${PORT}`));
