@@ -58,6 +58,27 @@ const DIAGNOSIS_SCHEMA = {
         light: { type: 'string' },
         water: { type: 'string' },
         water_every_days: { type: 'integer', description: 'Typical days between waterings in the current season in Israel' },
+        fertilize_every_days: { type: 'integer', description: 'Typical days between feedings in the current season in Israel; 0 if the plant should not be fed now' },
+        mist_every_days: { type: 'integer', description: 'Days between misting/leaf spraying now; 0 if the plant does not need misting' },
+        prune_every_days: { type: 'integer', description: 'Days between light pruning/tidying (dead leaves, leggy stems); 0 if not needed' },
+        repot_every_days: { type: 'integer', description: 'Days between repotting or refreshing soil (e.g. 365-730); 0 for in-ground garden plants' },
+        light_level: { type: 'string', enum: ['low', 'medium', 'bright_indirect', 'direct'], description: 'Light the plant needs: low (shade), medium, bright indirect, or direct sun' },
+        seasonal_plan: {
+          type: 'object',
+          description: 'Care intervals in days for the Israeli warm season (Apr-Oct) and cool season (Nov-Mar), for the given location; 0 means skip',
+          properties: Object.fromEntries(['warm', 'cool'].map(season => [season, {
+            type: 'object',
+            properties: {
+              water_every_days: { type: 'integer' },
+              fertilize_every_days: { type: 'integer' },
+              mist_every_days: { type: 'integer' },
+            },
+            required: ['water_every_days', 'fertilize_every_days', 'mist_every_days'],
+            additionalProperties: false,
+          }])),
+          required: ['warm', 'cool'],
+          additionalProperties: false,
+        },
         soil: { type: 'string' },
         humidity: { type: 'string' },
         temperature: { type: 'string' },
@@ -66,7 +87,7 @@ const DIAGNOSIS_SCHEMA = {
         pet_toxicity: { type: 'string' },
         best_location: { type: 'string' },
       },
-      required: ['light', 'water', 'water_every_days', 'soil', 'humidity', 'temperature', 'fertilizer', 'repotting', 'pet_toxicity', 'best_location'],
+      required: ['light', 'water', 'water_every_days', 'fertilize_every_days', 'mist_every_days', 'prune_every_days', 'repot_every_days', 'light_level', 'seasonal_plan', 'soil', 'humidity', 'temperature', 'fertilizer', 'repotting', 'pet_toxicity', 'best_location'],
       additionalProperties: false,
     },
     tips: { type: 'array', items: { type: 'string' } },
@@ -91,6 +112,23 @@ Rules:
 const LOCATION_LABELS = { indoor: 'בתוך הבית', balcony: 'מרפסת', garden: 'גינה' };
 const ALLOWED_MEDIA = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
+// Streams the request (long vision answers can take a while) and asks the API to retry
+// on a fallback model if the primary one declines. If this account can't use that beta,
+// the request is sent once more without it.
+export async function createWithFallback(anthropic, params) {
+  try {
+    return await anthropic.beta.messages
+      .stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
+      .finalMessage();
+  } catch (err) {
+    if (err instanceof Anthropic.BadRequestError && /fallback|beta/i.test(err.message)) {
+      console.warn('fallback beta rejected, retrying without it:', err.message);
+      return anthropic.messages.stream(params).finalMessage();
+    }
+    throw err;
+  }
+}
+
 export async function diagnosePlant({ image, mediaType, location, notes, knownSpecies }) {
   const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
@@ -102,13 +140,10 @@ export async function diagnosePlant({ image, mediaType, location, notes, knownSp
     notes ? `Notes from the grower: ${notes}` : null,
   ].filter(Boolean).join('\n');
 
-  const response = await anthropic.beta.messages.create({
+  const params = {
     model: 'claude-opus-5-5',
     max_tokens: 16000,
     system: SYSTEM_PROMPT,
-    // If the primary model declines, the API retries on a fallback model in the same call.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
     messages: [{
       role: 'user',
       content: [
@@ -117,11 +152,13 @@ export async function diagnosePlant({ image, mediaType, location, notes, knownSp
       ],
     }],
     output_config: {
-      // Medium effort keeps a vision diagnosis well within the 60s function limit.
+      // Medium effort balances diagnosis quality with how long the user waits.
       effort: 'medium',
       format: { type: 'json_schema', schema: DIAGNOSIS_SCHEMA },
     },
-  });
+  };
+
+  const response = await createWithFallback(anthropic, params);
 
   if (response.stop_reason === 'refusal') throw new Error('Model declined the request');
   if (response.stop_reason === 'max_tokens') throw new Error('Response was cut off');
@@ -154,8 +191,10 @@ export async function getDiagnosisPayload(body) {
     });
     return { status: 200, body: result };
   } catch (err) {
-    console.error('diagnose error:', err.message);
-    const status = err instanceof Anthropic.RateLimitError ? 429 : 500;
-    return { status, body: { error: err.message } };
+    console.error('diagnose error:', err.status, err.message);
+    if (err instanceof Anthropic.RateLimitError) return { status: 429, body: { error: 'יותר מדי בקשות כרגע, נסו שוב בעוד דקה' } };
+    if (err instanceof Anthropic.AuthenticationError) return { status: 500, body: { error: 'מפתח ה-API של Anthropic לא תקין. בדקו את ANTHROPIC_API_KEY ב-Vercel.' } };
+    if (err instanceof Anthropic.APIError && err.status === 529) return { status: 503, body: { error: 'השירות עמוס כרגע, נסו שוב בעוד רגע' } };
+    return { status: 500, body: { error: err.message } };
   }
 }

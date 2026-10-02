@@ -1,103 +1,303 @@
-import { useState } from 'react'
-import ResultView, { HealthBadge } from './ResultView.jsx'
-import { WaterBadge } from './PlantList.jsx'
-import { formatDate, LOCATIONS } from '../lib/labels.js'
-import { wateringStatus } from '../lib/storage.js'
+import { useRef, useState } from 'react'
+import ResultView, { CareGuide, HealthBadge } from './ResultView.jsx'
+import { BackIcon, CalendarIcon, CameraIcon, CheckIcon, PinIcon } from './Icons.jsx'
+import { formatDate, formatShortDate } from '../lib/labels.js'
+import { SEASON_LABEL, TASKS, applySeasonPlan, completeTask, currentSeason, dueLabel, newId, plantPhoto, taskStatus } from '../lib/storage.js'
+import LightMeter, { LIGHT_LEVELS } from './LightMeter.jsx'
+import { downloadTaskIcs } from '../lib/reminders.js'
+import { resizeImage, thumbnailFromDataUrl } from '../lib/image.js'
 
-export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan }) {
-  const [scanIdx, setScanIdx] = useState(0)
-  const scan = plant.scans[scanIdx] || plant.scans[0]
-  const w = wateringStatus(plant)
+function TaskCard({ plant, type, onUpdate }) {
+  const t = TASKS[type]
+  const st = taskStatus(plant, type)
+  const late = st && st.dueInDays < 0
+  return (
+    <div className="card space-y-3">
+      <div className="flex items-center gap-3">
+        <span className={`w-11 h-11 rounded-2xl grid place-items-center text-xl shrink-0 ${t.color}`}>{t.icon}</span>
+        <div className="flex-1">
+          <div className="font-extrabold text-stone-900">{t.label}</div>
+          <div className="text-sm text-stone-500">
+            {st ? (
+              <>הבא: <span className={late ? 'text-red-600 font-bold' : st.dueInDays === 0 ? 'text-mint-600 font-bold' : ''}>{dueLabel(st.dueInDays)}</span>
+                {plant[t.last] && <> · אחרון {formatShortDate(plant[t.last])}</>}</>
+            ) : 'ללא תזכורת'}
+          </div>
+        </div>
+        {st && (
+          <button
+            aria-label={`${t.label} בוצע`}
+            onClick={() => onUpdate(p => completeTask(p, type))}
+            className="w-11 h-11 rounded-full bg-mint-500 text-white grid place-items-center active:scale-90 transition shadow"
+          >
+            <CheckIcon className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2 text-sm flex-wrap">
+        <span>כל</span>
+        <input
+          type="number"
+          min="0"
+          max="120"
+          inputMode="numeric"
+          value={plant[t.every] || ''}
+          placeholder="—"
+          onChange={e => onUpdate(p => ({ ...p, [t.every]: Number(e.target.value) || null }))}
+          className="w-16 border border-stone-200 rounded-xl px-2 py-1.5 text-center"
+        />
+        <span>ימים</span>
+        {!['water', 'fertilize'].includes(type) && (
+          <button onClick={() => onUpdate(p => ({ ...p, [t.every]: null }))} className="text-stone-400 underline">הסרה</button>
+        )}
+        {st && (
+          <button onClick={() => downloadTaskIcs(plant, type)} className="mr-auto flex items-center gap-1.5 text-mint-600 font-bold">
+            <CalendarIcon className="w-4 h-4" /> הוסף ליומן
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
-  const rename = () => {
-    const name = prompt('שם חדש לצמח:', plant.name)
-    if (name?.trim()) onUpdate(p => ({ ...p, name: name.trim() }))
+// Optional tasks the plant doesn't have yet, with a sensible default interval.
+function AddTask({ plant, onUpdate }) {
+  const care = plant.scans[0]?.result?.care
+  const DEFAULTS = { mist: 3, prune: 60, repot: 365 }
+  const missing = Object.keys(DEFAULTS).filter(type => !plant[TASKS[type].every])
+  if (!missing.length) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-1">
+      <span className="text-sm text-stone-500">הוספת תזכורת:</span>
+      {missing.map(type => (
+        <button
+          key={type}
+          onClick={() => onUpdate(p => ({ ...p, [TASKS[type].every]: care?.[TASKS[type].care] || DEFAULTS[type], [TASKS[type].last]: p[TASKS[type].last] || new Date().toISOString() }))}
+          className="rounded-full border border-mint-200 bg-white px-3 py-1.5 text-sm font-bold text-forest"
+        >
+          + {TASKS[type].icon} {TASKS[type].label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SeasonPlan({ plant, onUpdate }) {
+  const plan = plant.scans[0]?.result?.care?.seasonal_plan
+  if (!plan) return null
+  const season = currentSeason()
+  const auto = plant.autoSeason !== false
+  const row = s => ['water', 'fertilize', 'mist']
+    .filter(type => plan[s][TASKS[type].care])
+    .map(type => `${TASKS[type].icon} כל ${plan[s][TASKS[type].care]}`)
+    .join('  ·  ') || '—'
+  return (
+    <div className="card bg-gradient-to-l from-mint-50 to-white space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="font-extrabold text-forest">🗓️ תוכנית טיפול עונתית</div>
+          <div className="text-xs text-stone-500">מותאמת ל{plant.site} ולאקלים בישראל</div>
+        </div>
+        <button
+          role="switch"
+          aria-checked={auto}
+          aria-label="עדכון אוטומטי לפי עונה"
+          onClick={() => onUpdate(p => (auto ? { ...p, autoSeason: false } : applySeasonPlan({ ...p, autoSeason: true, seasonApplied: null })))}
+          className={`shrink-0 w-12 h-7 rounded-full p-0.5 transition ${auto ? 'bg-mint-500' : 'bg-stone-200'}`}
+        >
+          <span className={`block w-6 h-6 rounded-full bg-white shadow transition ${auto ? '-translate-x-5' : ''}`} />
+        </button>
+      </div>
+      {['warm', 'cool'].map(s => (
+        <div key={s} className={`rounded-2xl px-3 py-2 text-sm ${s === season ? 'bg-white border border-mint-200' : 'text-stone-500'}`}>
+          <div className="font-bold">{s === 'warm' ? '☀️' : '❄️'} {SEASON_LABEL[s]}{s === season && ' · עכשיו'}</div>
+          <div>{row(s)} ימים</div>
+        </div>
+      ))}
+      <p className="text-xs text-stone-500">{auto ? 'הלוח מתעדכן לבד כשמתחלפת העונה.' : 'עדכון אוטומטי כבוי — הלוח נשאר כפי שקבעתם.'}</p>
+    </div>
+  )
+}
+
+function LightCard({ plant, onMeasure }) {
+  const care = plant.scans[0]?.result?.care
+  const need = LIGHT_LEVELS.find(l => l.id === care?.light_level)
+  return (
+    <div className="card flex items-center gap-3">
+      <span className="w-11 h-11 rounded-2xl grid place-items-center text-xl shrink-0 bg-amber-50">☀️</span>
+      <div className="flex-1 min-w-0">
+        <div className="font-extrabold text-stone-900">אור{need && `: ${need.label}`}</div>
+        <div className="text-sm text-stone-500 line-clamp-2">{need?.hint || care?.light || 'בדקו אם המקום מואר מספיק'}</div>
+      </div>
+      <button onClick={onMeasure} className="shrink-0 rounded-2xl bg-amber-400 text-stone-900 font-bold px-3 py-2 text-sm">מד אור</button>
+    </div>
+  )
+}
+
+const ENTRY = {
+  ...Object.fromEntries(Object.entries(TASKS).map(([k, t]) => [k, { icon: t.icon, text: t.done }])),
+  season: { icon: '🗓️' },
+  note: { icon: '📝' },
+  photo: { icon: '📸' },
+  scan: { icon: '🩺' },
+}
+
+function Journal({ plant, onUpdate }) {
+  const photoRef = useRef(null)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const add = entry => onUpdate(p => ({ ...p, journal: [{ id: newId(), date: new Date().toISOString(), ...entry }, ...p.journal] }))
+
+  const onPhoto = async e => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setBusy(true)
+    try {
+      const thumb = await thumbnailFromDataUrl(await resizeImage(file), 480)
+      add({ type: 'photo', thumb, text: note.trim() })
+      setNote('')
+    } catch {
+      alert('לא הצלחנו לקרוא את התמונה.')
+    } finally {
+      setBusy(false)
+    }
   }
+
+  // Scans are part of the plant's story too: merge them into the timeline.
+  const entries = [
+    ...plant.journal,
+    ...plant.scans.map(s => ({ id: s.id, date: s.date, type: 'scan', thumb: s.thumb, status: s.result?.health?.status, text: s.result?.health?.summary })),
+  ].sort((a, b) => new Date(b.date) - new Date(a.date))
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="text-sm font-bold text-green-800">→ חזרה לצמחים שלי</button>
-
-      <div className="card flex gap-3 items-center">
-        <img src={plant.scans[0]?.thumb} alt="" className="w-20 h-20 rounded-xl object-cover" />
-        <div className="flex-1 min-w-0">
-          <button onClick={rename} className="text-xl font-extrabold truncate block text-right">{plant.name} ✏️</button>
-          <p className="text-xs text-stone-500 italic" dir="ltr">{plant.scans[0]?.result?.identification?.scientific_name}</p>
-          <select
-            value={plant.location}
-            onChange={e => onUpdate(p => ({ ...p, location: e.target.value }))}
-            className="mt-1 text-xs border border-stone-200 rounded-lg px-2 py-1 bg-white"
-          >
-            {LOCATIONS.map(l => <option key={l.id} value={l.id}>{l.icon} {l.label}</option>)}
-          </select>
-        </div>
-      </div>
-
       <div className="card space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-extrabold">💧 השקיה</h3>
-          <WaterBadge plant={plant} />
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          rows={2}
+          placeholder="מה חדש? עלה חדש, פריחה, העברה לעציץ גדול..."
+          className="w-full rounded-2xl border border-stone-200 p-3 text-sm focus:outline-mint-500"
+        />
+        <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} />
+        <div className="grid grid-cols-2 gap-2">
+          <button className="btn-primary py-2.5" disabled={!note.trim()} onClick={() => { add({ type: 'note', text: note.trim() }); setNote('') }}>📝 הוספת הערה</button>
+          <button className="btn-ghost py-2.5" disabled={busy} onClick={() => photoRef.current.click()}>{busy ? '...' : '📸 תמונת התקדמות'}</button>
         </div>
-        <div className="text-sm text-stone-600 space-y-1">
-          <div>השקיה אחרונה: {plant.lastWatered ? formatDate(plant.lastWatered) : 'עוד לא נרשמה'}</div>
-          {w?.next && <div>ההשקיה הבאה: {formatDate(w.next)}</div>}
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <span>להשקות כל</span>
-          <input
-            type="number"
-            min="1"
-            max="60"
-            value={plant.waterEveryDays || ''}
-            onChange={e => onUpdate(p => ({ ...p, waterEveryDays: Number(e.target.value) || null }))}
-            className="w-16 border border-stone-200 rounded-lg px-2 py-1 text-center"
-          />
-          <span>ימים</span>
-        </div>
-        <button
-          className="btn-primary w-full bg-sky-600 hover:bg-sky-700"
-          onClick={() => onUpdate(p => ({ ...p, lastWatered: new Date().toISOString() }))}
-        >
-          💧 השקיתי עכשיו
-        </button>
       </div>
 
-      <button className="btn-ghost w-full" onClick={onRescan}>📷 סריקת מעקב — איך הצמח עכשיו?</button>
+      {entries.length === 0 && <p className="text-center text-sm text-stone-500">היומן ריק. השקיה, דישון והערות יופיעו כאן.</p>}
 
-      {plant.scans.length > 1 && (
-        <div className="card">
-          <h3 className="font-extrabold mb-3">📅 היסטוריית סריקות</h3>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {plant.scans.map((s, i) => (
-              <button
-                key={s.id}
-                onClick={() => setScanIdx(i)}
-                className={`shrink-0 w-24 rounded-xl border-2 overflow-hidden ${i === scanIdx ? 'border-green-600' : 'border-transparent'}`}
-              >
-                <img src={s.thumb} alt="" className="w-24 h-20 object-cover" />
-                <div className="text-[10px] py-1">{formatDate(s.date)}</div>
-                <div className="pb-1 scale-75"><HealthBadge status={s.result.health.status} /></div>
-              </button>
-            ))}
+      <ol className="relative border-r-2 border-mint-100 mr-4 space-y-4">
+        {entries.map(e => (
+          <li key={e.id} className="relative pr-6">
+            <span className="absolute -right-[15px] top-1 w-7 h-7 rounded-full bg-white border-2 border-mint-100 grid place-items-center text-sm">{ENTRY[e.type]?.icon}</span>
+            <div className="text-xs text-stone-400">{formatDate(e.date)}</div>
+            <div className="text-sm text-stone-800">
+              {e.type === 'scan' ? <span className="font-bold">סריקת בריאות</span> : ENTRY[e.type]?.text && <span className="font-bold">{ENTRY[e.type].text}</span>}
+              {e.status && <span className="mr-2 inline-block scale-90 origin-right"><HealthBadge status={e.status} /></span>}
+              {e.text && <p className="mt-0.5 whitespace-pre-line">{e.text}</p>}
+            </div>
+            {e.thumb && <img src={e.thumb} alt="" className="mt-2 w-40 h-40 object-cover rounded-2xl" />}
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan, onAsk }) {
+  const [tab, setTab] = useState('care')
+  const [meter, setMeter] = useState(false)
+  const [scanIdx, setScanIdx] = useState(0)
+  const scan = plant.scans[scanIdx] || plant.scans[0]
+  const care = plant.scans[0]?.result?.care
+  const id = plant.scans[0]?.result?.identification
+
+  return (
+    <div className="space-y-4">
+      <div className="relative -mx-4 -mt-4">
+        <img src={plantPhoto(plant)} alt="" className="w-full h-72 object-cover bg-mint-50" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+        <button onClick={onBack} aria-label="חזרה" className="absolute top-[max(env(safe-area-inset-top),12px)] right-4 w-10 h-10 rounded-full bg-white/90 text-forest grid place-items-center shadow">
+          <BackIcon className="w-5 h-5" />
+        </button>
+        <div className="absolute bottom-4 inset-x-4 text-white">
+          <h2 className="text-3xl font-extrabold drop-shadow">{plant.name}</h2>
+          {id?.scientific_name && <p className="italic text-white/80" dir="ltr" style={{ textAlign: 'right' }}>{id.scientific_name}</p>}
+          <p className="mt-1 flex items-center gap-1.5 text-sm"><PinIcon className="w-4 h-4" />{plant.site}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-mint-100/70 text-sm">
+        {[['care', 'טיפול'], ['journal', 'יומן'], ['health', 'בריאות'], ['guide', 'מדריך']].map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`py-2 rounded-xl font-bold transition ${tab === k ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'care' && (
+        <div className="space-y-3">
+          <SeasonPlan plant={plant} onUpdate={onUpdate} />
+          {Object.keys(TASKS).filter(type => ['water', 'fertilize'].includes(type) || plant[TASKS[type].every]).map(type => (
+            <TaskCard key={type} plant={plant} type={type} onUpdate={onUpdate} />
+          ))}
+          <AddTask plant={plant} onUpdate={onUpdate} />
+          {care?.water && <p className="text-sm text-stone-500 px-1">💡 {care.water}</p>}
+          <LightCard plant={plant} onMeasure={() => setMeter(true)} />
+          <div className="grid grid-cols-2 gap-2">
+            <button className="btn-ghost" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקה חדשה</button>
+            <button className="btn-ghost" onClick={onAsk}>💬 לשאול את המומחה</button>
           </div>
+          <button
+            className="w-full text-sm text-red-600 py-3"
+            onClick={() => confirm(`למחוק את "${plant.name}" מהאוסף?`) && onDelete()}
+          >
+            🗑️ מחיקת הצמח
+          </button>
         </div>
       )}
 
-      {scan && (
-        <>
-          <p className="text-xs text-stone-500 px-1">
-            אבחון מתאריך {formatDate(scan.date)}{scan.notes ? ` · הערות: ${scan.notes}` : ''}
-          </p>
-          <ResultView result={scan.result} />
-        </>
+      {tab === 'journal' && <Journal plant={plant} onUpdate={onUpdate} />}
+
+      {tab === 'health' && (
+        <div className="space-y-4">
+          <button className="btn-primary w-full" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקת מעקב — איך הצמח עכשיו?</button>
+          {plant.scans.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {plant.scans.map((s, i) => (
+                <button
+                  key={s.id}
+                  onClick={() => setScanIdx(i)}
+                  className={`shrink-0 w-24 rounded-2xl border-2 overflow-hidden bg-white ${i === scanIdx ? 'border-mint-500' : 'border-transparent'}`}
+                >
+                  <img src={s.thumb} alt="" className="w-24 h-20 object-cover" />
+                  <div className="text-[10px] py-1">{formatDate(s.date)}</div>
+                </button>
+              ))}
+            </div>
+          )}
+          {scan && (
+            <>
+              <p className="text-xs text-stone-500 px-1">
+                אבחון מתאריך {formatDate(scan.date)}{scan.notes ? ` · הערות: ${scan.notes}` : ''}
+              </p>
+              <ResultView result={scan.result} hideCare />
+            </>
+          )}
+        </div>
       )}
 
-      <button
-        className="w-full text-sm text-red-600 py-3"
-        onClick={() => confirm(`למחוק את "${plant.name}" מהאוסף?`) && onDelete()}
-      >
-        🗑️ מחיקת הצמח
-      </button>
+      {meter && <LightMeter plant={plant} onClose={() => setMeter(false)} />}
+
+      {tab === 'guide' && (care ? <CareGuide care={care} /> : <p className="text-center text-sm text-stone-500">אין עדיין מדריך לצמח הזה.</p>)}
     </div>
   )
 }
