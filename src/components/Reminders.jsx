@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BellIcon, CheckIcon } from './Icons.jsx'
+import { tipOfTheDay } from '../lib/articles.js'
 import { TASKS, allTasks, dueLabel, plantPhoto } from '../lib/storage.js'
 import {
   loadReminderSettings, notificationsSupported, requestNotifications, saveReminderSettings,
@@ -36,6 +37,30 @@ function TaskRow({ task, onDone, onOpen }) {
   )
 }
 
+// A tip from the user's own plants when there are fresh ones, otherwise one from the articles.
+function TipOfTheDay({ plants, onOpenArticle, onOpenPlant }) {
+  const day = Math.floor(Date.now() / 86_400_000)
+  const personal = plants.flatMap(p => (p.tips?.data?.tips || []).map(t => ({ plant: p, tip: t })))
+  if (personal.length) {
+    const { plant, tip } = personal[day % personal.length]
+    return (
+      <button onClick={() => onOpenPlant(plant.id, 'guide')} className="card w-full text-right bg-gradient-to-bl from-amber-50 to-white">
+        <div className="text-xs font-bold text-amber-700">💡 טיפ היום · {plant.name}</div>
+        <div className="font-extrabold text-stone-900 mt-1">{tip.title}</div>
+        <p className="text-sm text-stone-600 mt-0.5 line-clamp-3">{tip.body}</p>
+      </button>
+    )
+  }
+  const { text, article } = tipOfTheDay()
+  return (
+    <button onClick={() => onOpenArticle(article.id)} className="card w-full text-right bg-gradient-to-bl from-amber-50 to-white">
+      <div className="text-xs font-bold text-amber-700">💡 טיפ היום</div>
+      <p className="text-sm text-stone-700 mt-1">{text}</p>
+      <div className="text-xs font-bold text-mint-600 mt-1.5">{article.emoji} מתוך: {article.title} ←</div>
+    </button>
+  )
+}
+
 function NotificationsCard() {
   const [s, setS] = useState(loadReminderSettings)
   const update = next => {
@@ -69,7 +94,7 @@ function NotificationsCard() {
   )
 }
 
-export default function Reminders({ plants, onComplete, onOpen, onScan }) {
+export default function Reminders({ plants, onComplete, onOpen, onScan, onOpenArticle }) {
   const [justDone, setJustDone] = useState(null)
   const tasks = allTasks(plants)
   const today = tasks.filter(t => t.dueInDays <= 0)
@@ -88,6 +113,8 @@ export default function Reminders({ plants, onComplete, onOpen, onScan }) {
         <div className="card p-3"><div className="text-2xl font-extrabold text-mint-600">{today.length}</div><div className="text-xs text-stone-500">משימות היום</div></div>
         <div className="card p-3"><div className="text-2xl font-extrabold text-sky-600">{soon.length}</div><div className="text-xs text-stone-500">השבוע</div></div>
       </div>
+
+      <TipOfTheDay plants={plants} onOpenArticle={onOpenArticle} onOpenPlant={onOpen} />
 
       <section className="space-y-3">
         <h2 className="text-xl font-extrabold text-forest">היום</h2>

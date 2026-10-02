@@ -57,6 +57,7 @@ export async function getSession(req) {
 const LIMITS = {
   diagnose: Number(process.env.DAILY_SCANS_PER_USER) || 40,
   chat: Number(process.env.DAILY_CHATS_PER_USER) || 150,
+  tips: Number(process.env.DAILY_TIPS_PER_USER) || 30,
 };
 const GLOBAL_LIMIT = Number(process.env.DAILY_AI_LIMIT) || 600;
 

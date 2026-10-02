@@ -4,6 +4,7 @@ import { BackIcon, CalendarIcon, CameraIcon, CheckIcon, PinIcon } from './Icons.
 import { formatDate, formatShortDate } from '../lib/labels.js'
 import { SEASON_LABEL, TASKS, applySeasonPlan, completeTask, currentSeason, dueLabel, newId, plantPhoto, taskStatus } from '../lib/storage.js'
 import LightMeter, { LIGHT_LEVELS } from './LightMeter.jsx'
+import PlantTips from './PlantTips.jsx'
 import { downloadTaskIcs } from '../lib/reminders.js'
 import { resizeImage, thumbnailFromDataUrl } from '../lib/image.js'
 
@@ -208,8 +209,8 @@ function Journal({ plant, onUpdate }) {
   )
 }
 
-export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan, onAsk }) {
-  const [tab, setTab] = useState('care')
+export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan, onAsk, onOpenArticle, locked, initialTab = 'care' }) {
+  const [tab, setTab] = useState(initialTab)
   const [meter, setMeter] = useState(false)
   const [scanIdx, setScanIdx] = useState(0)
   const scan = plant.scans[scanIdx] || plant.scans[0]
@@ -232,7 +233,7 @@ export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onResca
       </div>
 
       <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-mint-100/70 text-sm">
-        {[['care', 'טיפול'], ['journal', 'יומן'], ['health', 'בריאות'], ['guide', 'מדריך']].map(([k, label]) => (
+        {[['care', 'טיפול'], ['guide', 'טיפים'], ['journal', 'יומן'], ['health', 'בריאות']].map(([k, label]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
@@ -297,7 +298,12 @@ export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onResca
 
       {meter && <LightMeter plant={plant} onClose={() => setMeter(false)} />}
 
-      {tab === 'guide' && (care ? <CareGuide care={care} /> : <p className="text-center text-sm text-stone-500">אין עדיין מדריך לצמח הזה.</p>)}
+      {tab === 'guide' && (
+        <div className="space-y-4">
+          <PlantTips plant={plant} onUpdate={onUpdate} onOpenArticle={onOpenArticle} locked={locked} />
+          {care && <CareGuide care={care} />}
+        </div>
+      )}
     </div>
   )
 }

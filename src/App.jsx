@@ -16,7 +16,7 @@ const TABS = [
   { id: 'diagnose', label: 'אבחון', Icon: KitIcon, title: 'אבחון', sub: 'מגלים מה מציק לצמח ואיך מטפלים' },
   { id: 'identify', label: 'זיהוי', Icon: SearchIcon, title: 'זיהוי צמח', sub: 'צלמו צמח וגלו מה הוא' },
   { id: 'chat', label: 'מומחה', Icon: ChatIcon, title: 'המומחה לצמחים', sub: 'שאלו כל שאלה על צמחים וגינון' },
-  { id: 'guide', label: 'מדריך', Icon: BookIcon, title: 'מדריך טיפול', sub: 'כל מה שצריך לדעת כדי לגדל נכון' },
+  { id: 'guide', label: 'מדריך', Icon: BookIcon, title: 'מדריך טיפול', sub: 'מאמרים וטיפים לגידול נכון' },
   { id: 'plants', label: 'הצמחים שלי', Icon: LeafIcon, title: 'הצמחים שלי', sub: 'שומרים על הצמחים מסודרים ומאושרים' },
 ]
 
@@ -28,6 +28,8 @@ export default function App() {
   const [storageError, setStorageError] = useState(false)
   const [chatDraft, setChatDraft] = useState('')
   const [accountOpen, setAccountOpen] = useState(false)
+  const [article, setArticle] = useState(null)
+  const [plantTab, setPlantTab] = useState('care')
   const { account, status: syncStatus, login, logout } = useCloudSync(plants, setPlants)
   // When the server has accounts, scanning and chat need a signed-in user.
   const locked = account.cloud && !account.user
@@ -57,11 +59,19 @@ export default function App() {
     setTab(t)
     setOpenId(null)
     setRescanId(null)
+    setArticle(null)
     window.scrollTo(0, 0)
   }
-  const showPlant = id => {
+  const showPlant = (id, plantTab = 'care') => {
     setTab('plants')
     setOpenId(id)
+    setPlantTab(plantTab)
+    window.scrollTo(0, 0)
+  }
+  const openArticle = id => {
+    setTab('guide')
+    setOpenId(null)
+    setArticle(id)
     window.scrollTo(0, 0)
   }
 
@@ -112,6 +122,7 @@ export default function App() {
             onComplete={(id, type) => updatePlant(id, p => completeTask(p, type))}
             onOpen={showPlant}
             onScan={() => goTab('identify')}
+            onOpenArticle={openArticle}
           />
         )}
 
@@ -138,7 +149,7 @@ export default function App() {
 
         {!locked && tab === 'chat' && <Chat plants={plants} draft={chatDraft} onDraftUsed={clearDraft} />}
 
-        {tab === 'guide' && <CareGuides plants={plants} onOpenPlant={showPlant} />}
+        {tab === 'guide' && <CareGuides plants={plants} onOpenPlant={showPlant} article={article} onArticle={setArticle} />}
 
         {tab === 'plants' && !openPlant && (
           <PlantList
@@ -158,6 +169,9 @@ export default function App() {
             onUpdate={fn => updatePlant(openPlant.id, fn)}
             onDelete={() => deletePlant(openPlant.id)}
             onAsk={() => askExpert(openPlant)}
+            onOpenArticle={openArticle}
+            locked={locked}
+            initialTab={plantTab}
             onRescan={() => {
               setRescanId(openPlant.id)
               setTab('diagnose')

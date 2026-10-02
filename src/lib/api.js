@@ -42,3 +42,17 @@ export async function chatStream({ messages, plants, signal, onDelta }) {
     onDelta(decoder.decode(value, { stream: true }));
   }
 }
+
+// Personalized tips for one plant (see api/_lib/tips-core.js).
+export async function fetchTips(plant) {
+  const r = await fetch('/api/tips', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ plant }),
+  }).catch(() => {
+    throw new Error('אין חיבור לשרת. בדקו את האינטרנט ונסו שוב.');
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || serverErrorText(r.status));
+  return body;
+}
