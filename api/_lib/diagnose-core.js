@@ -112,6 +112,23 @@ Rules:
 const LOCATION_LABELS = { indoor: 'בתוך הבית', balcony: 'מרפסת', garden: 'גינה' };
 const ALLOWED_MEDIA = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
+// Streams the request (long vision answers can take a while) and asks the API to retry
+// on a fallback model if the primary one declines. If this account can't use that beta,
+// the request is sent once more without it.
+export async function createWithFallback(anthropic, params) {
+  try {
+    return await anthropic.beta.messages
+      .stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
+      .finalMessage();
+  } catch (err) {
+    if (err instanceof Anthropic.BadRequestError && /fallback|beta/i.test(err.message)) {
+      console.warn('fallback beta rejected, retrying without it:', err.message);
+      return anthropic.messages.stream(params).finalMessage();
+    }
+    throw err;
+  }
+}
+
 export async function diagnosePlant({ image, mediaType, location, notes, knownSpecies }) {
   const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
@@ -123,13 +140,10 @@ export async function diagnosePlant({ image, mediaType, location, notes, knownSp
     notes ? `Notes from the grower: ${notes}` : null,
   ].filter(Boolean).join('\n');
 
-  const response = await anthropic.beta.messages.create({
+  const params = {
     model: 'claude-opus-5-5',
     max_tokens: 16000,
     system: SYSTEM_PROMPT,
-    // If the primary model declines, the API retries on a fallback model in the same call.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
     messages: [{
       role: 'user',
       content: [
@@ -138,11 +152,13 @@ export async function diagnosePlant({ image, mediaType, location, notes, knownSp
       ],
     }],
     output_config: {
-      // Medium effort keeps a vision diagnosis well within the 60s function limit.
+      // Medium effort balances diagnosis quality with how long the user waits.
       effort: 'medium',
       format: { type: 'json_schema', schema: DIAGNOSIS_SCHEMA },
     },
-  });
+  };
+
+  const response = await createWithFallback(anthropic, params);
 
   if (response.stop_reason === 'refusal') throw new Error('Model declined the request');
   if (response.stop_reason === 'max_tokens') throw new Error('Response was cut off');
@@ -175,8 +191,10 @@ export async function getDiagnosisPayload(body) {
     });
     return { status: 200, body: result };
   } catch (err) {
-    console.error('diagnose error:', err.message);
-    const status = err instanceof Anthropic.RateLimitError ? 429 : 500;
-    return { status, body: { error: err.message } };
+    console.error('diagnose error:', err.status, err.message);
+    if (err instanceof Anthropic.RateLimitError) return { status: 429, body: { error: 'יותר מדי בקשות כרגע, נסו שוב בעוד דקה' } };
+    if (err instanceof Anthropic.AuthenticationError) return { status: 500, body: { error: 'מפתח ה-API של Anthropic לא תקין. בדקו את ANTHROPIC_API_KEY ב-Vercel.' } };
+    if (err instanceof Anthropic.APIError && err.status === 529) return { status: 503, body: { error: 'השירות עמוס כרגע, נסו שוב בעוד רגע' } };
+    return { status: 500, body: { error: err.message } };
   }
 }

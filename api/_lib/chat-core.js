@@ -76,7 +76,7 @@ export function validateChatBody(body) {
 export async function streamChat({ messages, plants }, write) {
   const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
 
-  const stream = anthropic.beta.messages.stream({
+  const params = {
     model: 'claude-opus-5-5',
     max_tokens: 16000,
     system: [
@@ -86,13 +86,26 @@ export async function streamChat({ messages, plants }, write) {
     messages: toApiMessages(messages),
     // Conversational replies: low effort keeps answers quick on a phone.
     output_config: { effort: 'low' },
-    // If the primary model declines, the API retries on a fallback model in the same call.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-  });
+  };
 
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') write(event.delta.text);
+  // If the primary model declines, the API retries on a fallback model in the same call.
+  // If this account can't use that beta, start over without it (nothing was sent yet).
+  let stream = anthropic.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+  let wrote = false;
+  try {
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        wrote = true;
+        write(event.delta.text);
+      }
+    }
+  } catch (err) {
+    if (wrote || !(err instanceof Anthropic.BadRequestError && /fallback|beta/i.test(err.message))) throw err;
+    console.warn('fallback beta rejected, retrying without it:', err.message);
+    stream = anthropic.messages.stream(params);
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') write(event.delta.text);
+    }
   }
   const final = await stream.finalMessage();
   if (final.stop_reason === 'refusal') write('\n\nלא אוכל לעזור בזה. אשמח לענות על כל שאלה אחרת על צמחים 🌱');
