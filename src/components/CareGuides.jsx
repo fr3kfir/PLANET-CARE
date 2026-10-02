@@ -56,7 +56,6 @@ function ArticleView({ article, onBack, onOpen }) {
 
 export default function CareGuides({ plants, onOpenPlant, article: articleProp, onArticle }) {
   const [q, setQ] = useState('')
-  const [category, setCategory] = useState(null)
   const [meter, setMeter] = useState(false)
 
   const article = articleById(articleProp)
@@ -64,83 +63,83 @@ export default function CareGuides({ plants, onOpenPlant, article: articleProp, 
 
   const term = q.trim()
   const matches = a => !term || [a.title, a.subtitle, ...a.sections.flatMap(s => [s.h, s.p, ...(s.list || [])])].some(t => t?.includes(term))
-  const list = ARTICLES.filter(a => (!category || a.category === category) && matches(a))
-  const [featured, ...rest] = list
+  const found = ARTICLES.filter(matches)
   const mine = plants.filter(p => !term || p.name.includes(term))
 
   return (
-    <div className="space-y-5">
-      <label className="flex items-center gap-2 rounded-2xl bg-white border border-stone-200 px-4 py-3">
-        <SearchIcon className="w-5 h-5 text-stone-400" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש: השקיה, כנימות, ריחן..." className="flex-1 outline-none bg-transparent" />
-      </label>
+    <div className="space-y-6">
+      <form className="flex items-center gap-2 rounded-full bg-white border border-stone-200 p-1.5 pr-4 shadow-sm" onSubmit={e => e.preventDefault()}>
+        <input id="guide-search" value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש מדריכים: השקיה, כנימות, ריחן..." className="flex-1 min-w-0 outline-none bg-transparent" />
+        <span className="w-10 h-10 rounded-full bg-mint-500 text-white grid place-items-center shrink-0"><SearchIcon className="w-5 h-5" /></span>
+      </form>
 
       {mine.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-xl font-extrabold text-forest">טיפים לצמחים שלי</h2>
+          <div>
+            <h2 className="text-xl font-extrabold text-stone-900">הצמחים שלך</h2>
+            <p className="text-sm text-stone-500">מדריכים וטיפים אישיים לכל אחד מהצמחים שלך</p>
+          </div>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
             {mine.map(p => (
-              <button key={p.id} onClick={() => onOpenPlant(p.id, 'guide')} className="card p-0 overflow-hidden w-44 shrink-0 text-right">
-                <img src={plantPhoto(p)} alt="" className="w-full h-24 object-cover bg-mint-50" />
-                <div className="p-2.5">
-                  <div className="font-extrabold text-sm truncate">{p.name}</div>
-                  <div className="text-xs text-stone-500 mt-0.5 line-clamp-2 min-h-[2rem]">
-                    {p.tips?.data?.headline || 'טיפים אישיים לפי הזן, המיקום והעונה ←'}
-                  </div>
-                </div>
+              <button key={p.id} onClick={() => onOpenPlant(p.id, 'guide')} className="relative w-36 h-44 shrink-0 rounded-3xl overflow-hidden text-right shadow-sm">
+                <img src={plantPhoto(p)} alt="" className="absolute inset-0 w-full h-full object-cover bg-mint-100" />
+                <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <span className="absolute top-2 right-2 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-bold text-white">
+                  {p.tips?.data?.tips?.length ? `${p.tips.data.tips.length} טיפים` : 'טיפים אישיים'}
+                </span>
+                <span className="absolute bottom-2.5 inset-x-3 font-extrabold text-white leading-tight line-clamp-2">{p.name}</span>
               </button>
             ))}
           </div>
         </section>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-        <button
-          onClick={() => setCategory(null)}
-          className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-bold ${!category ? 'bg-forest text-white' : 'bg-white text-stone-600 border border-stone-200'}`}
-        >
-          הכול
-        </button>
-        {CATEGORIES.map(c => (
-          <button
-            key={c.id}
-            onClick={() => setCategory(c.id === category ? null : c.id)}
-            className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-bold ${category === c.id ? 'bg-forest text-white' : 'bg-white text-stone-600 border border-stone-200'}`}
-          >
-            {c.emoji} {c.label}
-          </button>
-        ))}
-      </div>
-
-      {featured && (
-        <button onClick={() => onArticle(featured.id)} className="card p-0 overflow-hidden w-full text-right">
-          <div className={`h-40 bg-gradient-to-bl ${featured.color} grid place-items-center text-7xl`}>{featured.emoji}</div>
-          <div className="p-4">
-            <div className="text-xs font-bold text-mint-600">{CATEGORIES.find(c => c.id === featured.category)?.label} · {featured.minutes} דק׳ קריאה</div>
-            <div className="text-xl font-extrabold text-stone-900 mt-1">{featured.title}</div>
-            <div className="text-sm text-stone-500 mt-0.5">{featured.subtitle}</div>
+      {term ? (
+        <section className="space-y-2">
+          <h2 className="text-xl font-extrabold text-stone-900">תוצאות ({found.length})</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {found.map(a => <ArticleCard key={a.id} article={a} onOpen={onArticle} />)}
           </div>
-        </button>
-      )}
-
-      {!category && !term && !IS_ARTIFACT && (
+          {!found.length && <p className="text-center text-sm text-stone-500 py-6">לא מצאנו מאמר על "{term}". נסו לשאול את המומחה בצ׳אט 💬</p>}
+        </section>
+      ) : (
         <>
-          {meter && <LightMeter onClose={() => setMeter(false)} />}
-          <button onClick={() => setMeter(true)} className="card w-full flex items-center gap-4 text-right bg-gradient-to-l from-amber-50 to-white">
-            <span className="w-14 h-14 rounded-2xl bg-amber-400 grid place-items-center text-3xl shrink-0">☀️</span>
-            <span className="flex-1">
-              <span className="block text-lg font-extrabold text-stone-900">מד אור</span>
-              <span className="block text-sm text-stone-500">מודדים במצלמה כמה אור יש במקום ובודקים אם הוא מתאים לצמח</span>
-            </span>
-          </button>
+          {!IS_ARTIFACT && (
+            <>
+              {meter && <LightMeter onClose={() => setMeter(false)} />}
+              <button onClick={() => setMeter(true)} className="card w-full flex items-center gap-4 text-right bg-gradient-to-l from-amber-50 to-white">
+                <span className="w-14 h-14 rounded-2xl bg-amber-400 grid place-items-center text-3xl shrink-0">☀️</span>
+                <span className="flex-1">
+                  <span className="block text-lg font-extrabold text-stone-900">מד אור</span>
+                  <span className="block text-sm text-stone-500">מודדים במצלמה כמה אור יש במקום ובודקים אם הוא מתאים לצמח</span>
+                </span>
+              </button>
+            </>
+          )}
+
+          {CATEGORIES.map(c => {
+            const list = ARTICLES.filter(a => a.category === c.id)
+            if (!list.length) return null
+            return (
+              <section key={c.id} className="space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-xl font-extrabold text-stone-900">{c.emoji} {c.label}</h2>
+                  <span className="text-sm font-bold text-mint-600">{list.length} מדריכים</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+                  {list.map(a => (
+                    <button key={a.id} onClick={() => onArticle(a.id)} className={`relative w-48 h-40 shrink-0 rounded-3xl overflow-hidden text-right bg-gradient-to-bl ${a.color} shadow-sm`}>
+                      <span className="absolute top-3 left-4 text-5xl">{a.emoji}</span>
+                      <span className="absolute top-2 right-2 rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-bold text-white">{a.minutes} דק׳ קריאה</span>
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent pt-8 pb-2.5 px-3 font-extrabold text-white leading-tight line-clamp-2">{a.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )
+          })}
         </>
       )}
-
-      <div className="grid grid-cols-2 gap-3">
-        {rest.map(a => <ArticleCard key={a.id} article={a} onOpen={onArticle} />)}
-      </div>
-
-      {!list.length && <p className="text-center text-sm text-stone-500 py-6">לא מצאנו מאמר על "{term}". נסו לשאול את המומחה בצ׳אט 💬</p>}
     </div>
   )
 }

@@ -66,6 +66,8 @@ export const DIAGNOSIS_SCHEMA = {
         prune_every_days: { type: 'integer', description: 'Days between light pruning/tidying (dead leaves, leggy stems); 0 if not needed' },
         repot_every_days: { type: 'integer', description: 'Days between repotting or refreshing soil (e.g. 365-730); 0 for in-ground garden plants' },
         light_level: { type: 'string', enum: ['low', 'medium', 'bright_indirect', 'direct'], description: 'Light the plant needs: low (shade), medium, bright indirect, or direct sun' },
+        difficulty: { type: 'string', enum: ['easy', 'medium', 'hard'], description: 'How hard this species is for a home grower' },
+        toxic_to_pets: { type: 'boolean', description: 'True if toxic to cats or dogs' },
         seasonal_plan: {
           type: 'object',
           description: 'Care intervals in days for the Israeli warm season (Apr-Oct) and cool season (Nov-Mar), for the given location; 0 means skip',
@@ -90,7 +92,7 @@ export const DIAGNOSIS_SCHEMA = {
         pet_toxicity: { type: 'string' },
         best_location: { type: 'string' },
       },
-      required: ['light', 'water', 'water_every_days', 'fertilize_every_days', 'mist_every_days', 'prune_every_days', 'repot_every_days', 'light_level', 'seasonal_plan', 'soil', 'humidity', 'temperature', 'fertilizer', 'repotting', 'pet_toxicity', 'best_location'],
+      required: ['light', 'water', 'water_every_days', 'fertilize_every_days', 'mist_every_days', 'prune_every_days', 'repot_every_days', 'light_level', 'difficulty', 'toxic_to_pets', 'seasonal_plan', 'soil', 'humidity', 'temperature', 'fertilizer', 'repotting', 'pet_toxicity', 'best_location'],
       additionalProperties: false,
     },
     tips: { type: 'array', items: { type: 'string' } },

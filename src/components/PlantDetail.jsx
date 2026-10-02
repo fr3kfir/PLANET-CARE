@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import ResultView, { CareGuide, HealthBadge } from './ResultView.jsx'
 import { BackIcon, CalendarIcon, CameraIcon, CheckIcon, PinIcon } from './Icons.jsx'
-import { formatDate, formatShortDate } from '../lib/labels.js'
+import { STATUS, formatDate, formatShortDate } from '../lib/labels.js'
 import { SEASON_LABEL, TASKS, applySeasonPlan, completeTask, currentSeason, dueLabel, newId, plantPhoto, taskStatus } from '../lib/storage.js'
 import LightMeter, { LIGHT_LEVELS } from './LightMeter.jsx'
 import PlantTips from './PlantTips.jsx'
@@ -211,54 +211,154 @@ function Journal({ plant, onUpdate }) {
   )
 }
 
-export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan, onAsk, onOpenArticle, locked, initialTab = 'care' }) {
-  const [tab, setTab] = useState(initialTab)
-  const [meter, setMeter] = useState(false)
+const DIFFICULTY = { easy: 'קל לגידול', medium: 'בינוני', hard: 'מאתגר' }
+
+// The quick facts strip under the plant's name, in the order a grower checks them.
+function FactChips({ plant, care }) {
+  const light = LIGHT_LEVELS.find(l => l.id === care?.light_level)
+  const every = plant.waterEveryDays
+  const water = every ? (every <= 4 ? 'השקיה גבוהה' : every <= 9 ? 'השקיה בינונית' : 'השקיה נמוכה') : null
+  const toxic = typeof care?.toxic_to_pets === 'boolean'
+    ? care.toxic_to_pets
+    : care?.pet_toxicity ? /רעיל/.test(care.pet_toxicity) && !/לא רעיל|אינו רעיל|בטוח/.test(care.pet_toxicity) : null
+  const chips = [
+    ['📍', plant.site],
+    ['☀️', light?.label],
+    ['🌱', DIFFICULTY[care?.difficulty]],
+    ['💧', water],
+    [toxic ? '⚠️' : '🐾', toxic === null ? null : toxic ? 'רעיל לחיות מחמד' : 'בטוח לחיות מחמד'],
+  ].filter(([, label]) => label)
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {chips.map(([icon, label], i) => (
+        <div key={i} className={`flex items-center gap-2 rounded-2xl bg-mint-50 px-3 py-2.5 text-sm font-bold text-stone-700 ${chips.length % 2 && i === chips.length - 1 ? 'col-span-2' : ''}`}>
+          <span className="text-base">{icon}</span>{label}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function HealthCard({ plant, onRescan }) {
+  const [open, setOpen] = useState(false)
   const [scanIdx, setScanIdx] = useState(0)
-  const scan = plant.scans[scanIdx] || plant.scans[0]
+  const last = plant.scans[0]
+  const health = last?.result?.health
+  const scan = plant.scans[scanIdx] || last
+  return (
+    <div className="card space-y-3">
+      <h3 className="text-lg font-extrabold text-stone-900">בריאות הצמח</h3>
+      <div className="flex items-center gap-3">
+        <span className={`w-12 h-12 rounded-full grid place-items-center text-xl ${health ? STATUS[health.status]?.cls || 'bg-mint-50' : 'bg-stone-100'}`}>
+          {health ? (health.status === 'healthy' ? '🌿' : health.status === 'critical' ? '🥀' : '🍂') : '❔'}
+        </span>
+        <div>
+          <div className="font-extrabold text-stone-900">מצב נוכחי: {health ? STATUS[health.status]?.label : 'לא אובחן'}</div>
+          <div className="text-sm text-stone-500">{last ? `סריקה אחרונה ${formatDate(last.date)}${health ? ` · ציון ${health.score}` : ''}` : 'עוד לא נסרק'}</div>
+        </div>
+      </div>
+      <button className="btn-primary w-full" onClick={onRescan}><CameraIcon className="w-5 h-5" /> אבחון אוטומטי</button>
+      {last && (
+        <button className="w-full text-sm font-bold text-mint-600" onClick={() => setOpen(o => !o)}>
+          {open ? 'הסתרת פרטי האבחון' : 'פרטי האבחון האחרון ←'}
+        </button>
+      )}
+      {open && (
+        <div className="space-y-3">
+          {plant.scans.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {plant.scans.map((s, i) => (
+                <button key={s.id} onClick={() => setScanIdx(i)} className={`shrink-0 w-24 rounded-2xl border-2 overflow-hidden bg-white ${i === scanIdx ? 'border-mint-500' : 'border-transparent'}`}>
+                  {s.thumb && <img src={s.thumb} alt="" className="w-24 h-20 object-cover" />}
+                  <div className="text-[10px] py-1">{formatDate(s.date)}</div>
+                </button>
+              ))}
+            </div>
+          )}
+          {scan?.result && <ResultView result={scan.result} hideCare />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const TAB_ALIASES = { care: 'overview', guide: 'info', health: 'overview' }
+
+export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onRescan, onAsk, onOpenArticle, locked, initialTab = 'overview' }) {
+  const [tab, setTab] = useState(TAB_ALIASES[initialTab] || initialTab)
+  const [meter, setMeter] = useState(false)
   const care = plant.scans[0]?.result?.care
   const id = plant.scans[0]?.result?.identification
+  const genus = id?.scientific_name?.split(' ')[0]
+  const otherNames = [id?.common_name_en, ...(id?.alternatives || [])].filter(Boolean).slice(0, 4)
 
   return (
     <div className="space-y-4">
       <div className="relative -mx-4 -mt-4">
-        <img src={plantPhoto(plant)} alt="" className="w-full h-72 object-cover bg-mint-50" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+        <img src={plantPhoto(plant)} alt="" className="w-full h-64 object-cover bg-mint-50" />
         <button onClick={onBack} aria-label="חזרה" className="absolute top-[max(env(safe-area-inset-top),12px)] right-4 w-10 h-10 rounded-full bg-white/90 text-forest grid place-items-center shadow">
           <BackIcon className="w-5 h-5" />
         </button>
-        <div className="absolute bottom-4 inset-x-4 text-white">
-          <h2 className="text-3xl font-extrabold drop-shadow">{plant.name}</h2>
-          {id?.scientific_name && <p className="italic text-white/80" dir="ltr" style={{ textAlign: 'right' }}>{id.scientific_name}</p>}
-          <p className="mt-1 flex items-center gap-1.5 text-sm"><PinIcon className="w-4 h-4" />{plant.site}</p>
-        </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-mint-100/70 text-sm">
-        {[['care', 'טיפול'], ['guide', 'טיפים'], ['journal', 'יומן'], ['health', 'בריאות']].map(([k, label]) => (
+      <div className="relative -mx-4 -mt-12 rounded-t-[28px] bg-white px-4 pt-5 pb-4 space-y-3 shadow-[0_-6px_20px_rgba(16,80,60,.08)]">
+        <div>
+          <h2 className="text-3xl font-extrabold text-stone-900 leading-tight">{plant.name}</h2>
+          {id?.family && <p className="text-sm text-stone-400">ממשפחת <i dir="ltr">{id.family}</i>{genus ? <>, סוג <i dir="ltr">{genus}</i></> : null}</p>}
+          {otherNames.length > 0 && <p className="text-sm text-stone-600 mt-1"><b>שמות נוספים:</b> {otherNames.join(', ')}</p>}
+          {id?.scientific_name && <p className="text-sm text-stone-600"><b>שם בוטני:</b> <i dir="ltr">{id.scientific_name}</i></p>}
+        </div>
+        <FactChips plant={plant} care={care} />
+      </div>
+
+      <div className="flex gap-6 border-b border-stone-200 px-1">
+        {[['overview', 'סקירה'], ['info', 'מידע על הצמח'], ['journal', 'יומן']].map(([k, label]) => (
           <button
             key={k}
             onClick={() => setTab(k)}
-            className={`py-2 rounded-xl font-bold transition ${tab === k ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+            className={`pb-2 -mb-px font-extrabold transition border-b-[3px] ${tab === k ? 'border-mint-500 text-forest' : 'border-transparent text-stone-400'}`}
           >
             {label}
           </button>
         ))}
       </div>
 
-      {tab === 'care' && (
-        <div className="space-y-3">
-          <SeasonPlan plant={plant} onUpdate={onUpdate} />
-          {Object.keys(TASKS).filter(type => ['water', 'fertilize'].includes(type) || plant[TASKS[type].every]).map(type => (
-            <TaskCard key={type} plant={plant} type={type} onUpdate={onUpdate} />
-          ))}
-          <AddTask plant={plant} onUpdate={onUpdate} />
-          {care?.water && <p className="text-sm text-stone-500 px-1">💡 {care.water}</p>}
-          <LightCard plant={plant} onMeasure={IS_ARTIFACT ? null : () => setMeter(true)} />
-          <div className="grid grid-cols-2 gap-2">
-            <button className="btn-ghost" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקה חדשה</button>
-            <button className="btn-ghost" onClick={onAsk}>💬 לשאול את המומחה</button>
-          </div>
+      {tab === 'overview' && (
+        <div className="space-y-4">
+          <HealthCard plant={plant} onRescan={onRescan} />
+
+          <section className="space-y-3">
+            <h3 className="text-lg font-extrabold text-stone-900 px-1">לוח טיפול</h3>
+            {Object.keys(TASKS).filter(type => ['water', 'fertilize'].includes(type) || plant[TASKS[type].every]).map(type => (
+              <TaskCard key={type} plant={plant} type={type} onUpdate={onUpdate} />
+            ))}
+            <AddTask plant={plant} onUpdate={onUpdate} />
+          </section>
+
+          <button onClick={onAsk} className="card w-full flex items-center gap-3 text-right">
+            <span className="w-14 h-14 rounded-full bg-gradient-to-br from-mint-200 to-amber-100 grid place-items-center text-2xl shrink-0">🧑‍🌾</span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-extrabold text-stone-900">צריכים עזרה נוספת עם הצמח?</span>
+              <span className="block text-sm text-stone-500">שאלו את המומחה וקבלו פתרון מדויק לבעיה</span>
+            </span>
+            <span className="text-stone-300 text-xl">‹</span>
+          </button>
+
+          <section className="card space-y-3">
+            <h3 className="text-lg font-extrabold text-stone-900">תוכנית הטיפול מבוססת על</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-2xl bg-mint-50 p-3">
+                <div className="font-extrabold text-stone-800">{currentSeason() === 'warm' ? '☀️ עונה חמה' : '❄️ עונה קרירה'}</div>
+                <div className="text-xs text-stone-500">עונה</div>
+              </div>
+              <div className="rounded-2xl bg-mint-50 p-3">
+                <div className="font-extrabold text-stone-800 truncate">📍 {plant.site}</div>
+                <div className="text-xs text-stone-500">מיקום</div>
+              </div>
+            </div>
+            <SeasonPlan plant={plant} onUpdate={onUpdate} />
+          </section>
+
           <button
             className="w-full text-sm text-red-600 py-3"
             onClick={async () => (await askConfirm({ title: `למחוק את "${plant.name}"?`, message: 'הצמח, היומן וההיסטוריה שלו יימחקו.', confirmText: 'מחיקה', danger: true })) && onDelete()}
@@ -268,44 +368,17 @@ export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onResca
         </div>
       )}
 
-      {tab === 'journal' && <Journal plant={plant} onUpdate={onUpdate} />}
-
-      {tab === 'health' && (
-        <div className="space-y-4">
-          <button className="btn-primary w-full" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקת מעקב — איך הצמח עכשיו?</button>
-          {plant.scans.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {plant.scans.map((s, i) => (
-                <button
-                  key={s.id}
-                  onClick={() => setScanIdx(i)}
-                  className={`shrink-0 w-24 rounded-2xl border-2 overflow-hidden bg-white ${i === scanIdx ? 'border-mint-500' : 'border-transparent'}`}
-                >
-                  <img src={s.thumb} alt="" className="w-24 h-20 object-cover" />
-                  <div className="text-[10px] py-1">{formatDate(s.date)}</div>
-                </button>
-              ))}
-            </div>
-          )}
-          {scan && (
-            <>
-              <p className="text-xs text-stone-500 px-1">
-                אבחון מתאריך {formatDate(scan.date)}{scan.notes ? ` · הערות: ${scan.notes}` : ''}
-              </p>
-              <ResultView result={scan.result} hideCare />
-            </>
-          )}
-        </div>
-      )}
-
-      {meter && <LightMeter plant={plant} onClose={() => setMeter(false)} />}
-
-      {tab === 'guide' && (
+      {tab === 'info' && (
         <div className="space-y-4">
           <PlantTips plant={plant} onUpdate={onUpdate} onOpenArticle={onOpenArticle} locked={locked} />
           {care && <CareGuide care={care} />}
+          <LightCard plant={plant} onMeasure={IS_ARTIFACT ? null : () => setMeter(true)} />
         </div>
       )}
+
+      {tab === 'journal' && <Journal plant={plant} onUpdate={onUpdate} />}
+
+      {meter && <LightMeter plant={plant} onClose={() => setMeter(false)} />}
     </div>
   )
 }

@@ -134,3 +134,16 @@ export function dueLabel(dueInDays) {
   if (dueInDays === 1) return 'מחר';
   return `בעוד ${dueInDays} ימים`;
 }
+
+// Care tasks falling on a given calendar day: overdue ones count as today; each task
+// then repeats every N days from its next due date. Past days have no tasks.
+export function tasksOnDay(plants, day) {
+  const d = startOfDay(day);
+  const today = startOfDay(Date.now());
+  if (d < today) return [];
+  return allTasks(plants).filter(t => {
+    const first = today + Math.max(0, t.dueInDays) * DAY;
+    if (d < first) return false;
+    return Math.round((d - first) / DAY) % t.every === 0;
+  });
+}
