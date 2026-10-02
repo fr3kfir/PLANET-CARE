@@ -1,8 +1,9 @@
 // Shared core for plant identification + health diagnosis — used by the Vercel
 // function (api/diagnose.js) and the local Express server (server.js).
-// Requires ANTHROPIC_API_KEY. Vercel ignores api/_lib (underscore prefix).
+// Requires an Anthropic API key (see anthropic-key.js). Vercel ignores api/_lib (underscore prefix).
 
 import Anthropic from '@anthropic-ai/sdk';
+import { MISSING_KEY_ERROR, anthropicClient } from './anthropic-key.js';
 
 const ISSUE_CATEGORIES = [
   'light_low', 'light_high', 'overwatering', 'underwatering', 'soil_drainage',
@@ -130,7 +131,7 @@ export async function createWithFallback(anthropic, params) {
 }
 
 export async function diagnosePlant({ image, mediaType, location, notes, knownSpecies }) {
-  const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY from env
+  const anthropic = anthropicClient();
 
   const month = new Date().toLocaleString('en-US', { month: 'long', timeZone: 'Asia/Jerusalem' });
   const context = [
@@ -170,8 +171,8 @@ export async function diagnosePlant({ image, mediaType, location, notes, knownSp
 
 // Returns { status, body } — platform wrappers turn this into a response.
 export async function getDiagnosisPayload(body) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return { status: 503, body: { error: 'ANTHROPIC_API_KEY is not configured on the server' } };
+  if (!anthropicClient()) {
+    return { status: 503, body: { error: MISSING_KEY_ERROR } };
   }
   const { image, mediaType = 'image/jpeg', location, notes, knownSpecies } = body || {};
   if (typeof image !== 'string' || image.length < 100) {

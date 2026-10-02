@@ -4,10 +4,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { streamChat, validateChatBody } from './_lib/chat-core.js';
 import { checkAiAccess } from './_lib/store.js';
+import { MISSING_KEY_ERROR, findAnthropicKey } from './_lib/anthropic-key.js';
 
 export async function handleChat(req, res) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'ANTHROPIC_API_KEY is not configured on the server' });
+  if (!findAnthropicKey()) {
+    return res.status(503).json({ error: MISSING_KEY_ERROR });
   }
   const input = validateChatBody(req.body);
   if (input.error) return res.status(400).json({ error: input.error });
