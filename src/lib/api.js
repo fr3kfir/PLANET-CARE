@@ -1,6 +1,7 @@
 import { authHeaders } from './cloud.js';
 import { IS_ARTIFACT } from './platform.js';
-import { chatWithClaude, diagnoseWithClaude, tipsWithClaude } from './claudeAI.js';
+import { chatWithClaude, completeCareWithClaude, diagnoseWithClaude, tipsWithClaude } from './claudeAI.js';
+export const completeCare = completeCareWithClaude;
 export { canSendImages } from './claudeAI.js';
 
 export async function diagnose({ dataUrl, description, location, notes, knownSpecies }) {

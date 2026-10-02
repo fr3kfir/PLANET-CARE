@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import ResultView from './ResultView.jsx'
 import CameraScanner from './CameraScanner.jsx'
 import ScanningOverlay from './ScanningOverlay.jsx'
-import { canSendImages, diagnose } from '../lib/api.js'
+import { canSendImages, completeCare, diagnose } from '../lib/api.js'
 import { IS_ARTIFACT } from '../lib/platform.js'
 import DescribePlant from './DescribePlant.jsx'
 import appIcon from '../icon.svg'
@@ -53,6 +53,20 @@ export default function ScanView({ mode = 'diagnose', targetPlant, onSaveNew, on
     setPhase('scanning')
     analyze(null, text)
   }
+
+  // Artifact scans return the identification first; fetch the care guide right after.
+  const [careError, setCareError] = useState('')
+  const [careTry, setCareTry] = useState(0)
+  useEffect(() => {
+    if (!result?.carePending) return
+    let cancelled = false
+    setCareError('')
+    completeCare(result, { location, notes })
+      .then(extra => !cancelled && setResult(r => ({ ...r, ...extra, carePending: false })))
+      .catch(err => !cancelled && setCareError(err.message))
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result?.carePending, careTry])
 
   const onFinished = useCallback(() => {
     setResult(pending)
@@ -154,10 +168,22 @@ export default function ScanView({ mode = 'diagnose', targetPlant, onSaveNew, on
       {phase === 'result' && result && (
         <>
           <img src={photo} alt="" className="w-full max-h-64 object-cover rounded-3xl" />
-          <ResultView result={result} mode={mode} />
+          <ResultView result={result} mode={mode} hideCare={result.carePending} />
+          {result.carePending && result.is_plant && (
+            <div className="card flex items-center gap-3 text-sm text-stone-600">
+              {careError ? (
+                <>
+                  <span className="flex-1">{careError}</span>
+                  <button className="btn-ghost py-2" onClick={() => setCareTry(n => n + 1)}>נסו שוב</button>
+                </>
+              ) : (
+                <><span className="w-5 h-5 rounded-full border-2 border-mint-500 border-t-transparent animate-spin" />מכינים מדריך גידול ולוח טיפול…</>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 sticky bottom-[calc(env(safe-area-inset-bottom)+88px)]">
             {result.is_plant && (
-              <button className="btn-primary shadow-lg" onClick={save}>
+              <button className="btn-primary shadow-lg" onClick={save} disabled={result.carePending}>
                 {targetPlant ? '💾 שמור בהיסטוריה' : '➕ הוספה לצמחים'}
               </button>
             )}

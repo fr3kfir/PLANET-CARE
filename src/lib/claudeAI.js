@@ -93,10 +93,35 @@ export async function diagnoseWithClaude({ dataUrl, description, location, notes
   const subject = dataUrl
     ? 'The attached photo shows the plant. Identify this plant and diagnose its health.'
     : `No photo could be sent. Identify the plant and assess its health from the grower's description below; set confidence to reflect that it is based on a description, and use photo_quality_note to say a photo would make the diagnosis more reliable.\n\nGrower's description:\n${String(description || '').slice(0, 2000)}`
-  const prompt = `${DIAGNOSIS_PROMPT}\n\n${diagnosisContext({ location, notes, knownSpecies })}\n\n${subject}\n\n${jsonInstruction(DIAGNOSIS_SCHEMA)}`
+  const prompt = `${DIAGNOSIS_PROMPT}\n\n${diagnosisContext({ location, notes, knownSpecies })}\n\n${subject}\n\n${BRIEF}\n\n${jsonInstruction(QUICK_SCHEMA)}`
   try {
     const result = await sample.json(prompt, { ...(dataUrl ? { images: dataUrlToBlob(dataUrl) } : {}), cache: false })
-    return normalizeDiagnosis(result)
+    // The care guide comes in a second, faster call (completeCareWithClaude) so the
+    // grower sees the identification and health check as soon as possible.
+    return { ...normalizeDiagnosis({ ...result, care: {}, tips: [] }), carePending: true }
+  } catch (e) {
+    throw failure(e)
+  }
+}
+
+// Split of the full diagnosis schema: what needs the photo, and the care guide that doesn't.
+const pick = (keys, from = DIAGNOSIS_SCHEMA.properties) => Object.fromEntries(keys.map(k => [k, from[k]]))
+const QUICK_KEYS = ['is_plant', 'identification', 'health', 'issues', 'photo_quality_note']
+const QUICK_SCHEMA = { ...DIAGNOSIS_SCHEMA, properties: pick(QUICK_KEYS), required: QUICK_KEYS }
+const CARE_SCHEMA = { ...DIAGNOSIS_SCHEMA, properties: pick(['care', 'tips']), required: ['care', 'tips'] }
+const BRIEF = 'Keep it brief so the grower gets the answer fast: description in one sentence, health summary in 1-2 sentences, at most 3 issues with at most 3 short treatment steps each.'
+
+// Second stage: care guide, schedule and seasonal plan from the identified species (no photo,
+// quick tier). Returns { care, tips } to merge into the result.
+export async function completeCareWithClaude(result, { location, notes }) {
+  const sample = await getSample()
+  const id = result.identification
+  const plant = `Plant: ${id.common_name_he} (${id.scientific_name || 'species uncertain'}).\nHealth: ${result.health.status} — ${result.health.summary}`
+  const prompt = `${DIAGNOSIS_PROMPT}\n\n${diagnosisContext({ location, notes })}\n\n${plant}\n\nWrite the care guide and tips for this plant. Keep each care field to one or two short sentences.\n\n${jsonInstruction(CARE_SCHEMA)}`
+  try {
+    const r = await sample.json(prompt, { modelTier: 'quick', cache: false })
+    const full = normalizeDiagnosis({ ...result, care: r?.care || {}, tips: r?.tips || [] })
+    return { care: full.care, tips: full.tips }
   } catch (e) {
     throw failure(e)
   }
@@ -106,7 +131,7 @@ export async function tipsWithClaude(plant) {
   const sample = await getSample()
   const prompt = `${TIPS_PROMPT}\n\n${describePlant(plant)}\n\nWrite personalized care tips for this plant.\n\n${jsonInstruction(TIPS_SCHEMA)}`
   try {
-    const r = await sample.json(prompt, { cache: false })
+    const r = await sample.json(prompt, { modelTier: 'quick', cache: false })
     return {
       headline: str(r?.headline),
       tips: arr(r?.tips).map(t => ({ title: str(t?.title), body: str(t?.body), category: str(t?.category, 'other'), priority: str(t?.priority, 'general') })).filter(t => t.title),
