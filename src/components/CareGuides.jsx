@@ -1,148 +1,145 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SearchIcon } from './Icons.jsx'
 import LightMeter from './LightMeter.jsx'
+import { ArticleCard } from './PlantTips.jsx'
+import { ARTICLES, CATEGORIES, articleById } from '../lib/articles.js'
 import { plantPhoto } from '../lib/storage.js'
 
-const GUIDES = [
-  {
-    id: 'water', icon: '💧', title: 'איך משקים נכון',
-    sub: 'הטעות הנפוצה ביותר היא השקיית יתר',
-    body: [
-      'בודקים לפני שמשקים: תוחבים אצבע 2–3 ס"מ לאדמה. יבש — משקים. לח — מחכים.',
-      'משקים לעומק עד שהמים יוצאים מחורי הניקוז, ושופכים את מה שהצטבר בתחתית אחרי 15 דקות.',
-      'בקיץ הישראלי צמחי מרפסת וגינה צריכים מים בתדירות כפולה ויותר; בחורף — הרבה פחות.',
-      'עדיף להשקות בבוקר מוקדם או בערב, לא בשמש של הצהריים.',
-      'עלים צהובים ורכים ואדמה שתמיד רטובה = השקיית יתר. עלים יבשים ופריכים ואדמה שמתנתקת מדופן העציץ = חוסר מים.',
-    ],
-  },
-  {
-    id: 'light', icon: '☀️', title: 'אור ומיקום',
-    sub: 'לכל צמח יש את החלון שלו',
-    body: [
-      'אור ישיר: מרפסת דרומית או מערבית, 6+ שעות שמש — לסוקולנטים, קקטוסים, תבלינים ועצי פרי.',
-      'אור עקיף בהיר: ליד חלון מזרחי או מטר–שניים מחלון דרומי — לרוב צמחי הבית (פוטוס, מונסטרה, פיקוס).',
-      'צל חלקי: חדרים פנימיים — לזמיוקולקס, סנסווייריה, ספטיפיליום.',
-      'סימני חוסר אור: גבעולים ארוכים ודקים, עלים קטנים, צמח שנוטה לכיוון החלון.',
-      'סימני עודף שמש: כתמים חומים-לבנים "שרופים" על העלים העליונים.',
-    ],
-  },
-  {
-    id: 'fertilize', icon: '🧪', title: 'דישון',
-    sub: 'מעט ובקביעות, רק בעונת הגדילה',
-    body: [
-      'מדשנים באביב ובקיץ (מרץ–ספטמבר) כל 2–4 שבועות; בחורף מפסיקים או מצמצמים מאוד.',
-      'דשן נוזלי מאוזן (כמו 20-20-20) בחצי מהריכוז שעל האריזה מתאים לרוב צמחי הבית.',
-      'לא מדשנים צמח יבש — משקים קודם, ואז מדשנים.',
-      'לא מדשנים צמח חולה או צמח שהועבר עציץ בחודש האחרון.',
-      'קרום לבן על פני האדמה = הצטברות מלחים. שוטפים את האדמה במים רבים.',
-    ],
-  },
-  {
-    id: 'pests', icon: '🐛', title: 'מזיקים נפוצים',
-    sub: 'כנימות, קמחיות, אקריות — ומה עושים',
-    body: [
-      'כנימת עלה: חרקים קטנים ירוקים/שחורים על קצות צמיחה. שוטפים בזרם מים ומרססים בסבון אשלגן.',
-      'כנימה קמחית: "צמר גפן" לבן בפינות העלים. מנגבים בצמר גפן טבול באלכוהול 70%.',
-      'אקרית אדומה: קורים דקים ונקודות צהבהבות בעלים, בעיקר באוויר יבש. מרססים מים ומעלים לחות; שמן נים.',
-      'זבובוני פטריות: זבובים קטנים סביב העציץ. מייבשים את שכבת האדמה העליונה בין השקיות.',
-      'תמיד בודקים את הצד התחתון של העלים, ומבודדים צמח נגוע משאר הצמחים.',
-    ],
-  },
-  {
-    id: 'repot', icon: '🪴', title: 'העברת עציץ',
-    sub: 'מתי ואיך מעבירים לעציץ גדול יותר',
-    body: [
-      'הזמן הנכון: אביב. סימנים — שורשים יוצאים מחורי הניקוז, המים עוברים מהר מדי, הצמח מפסיק לגדול.',
-      'עוברים לעציץ גדול ב-2–5 ס"מ בלבד. עציץ גדול מדי = אדמה שנשארת רטובה ושורשים נרקבים.',
-      'תמיד עציץ עם חור ניקוז. שכבת חצץ בתחתית לא מחליפה ניקוז.',
-      'מצע מנקז: אדמת שתילה + פרלייט (כ-30%). לסוקולנטים — הרבה יותר פרלייט או חול גס.',
-      'אחרי ההעברה משקים היטב ומוותרים על דישון לחודש.',
-    ],
-  },
-  {
-    id: 'seasons', icon: '🗓️', title: 'עונות בישראל',
-    sub: 'מה משתנה בין קיץ לחורף',
-    body: [
-      'קיץ (יוני–ספטמבר): חום ושרב. משקים יותר, מצלים צמחי מרפסת בשעות הצהריים, מגבירים לחות לצמחי בית.',
-      'סתיו: הזמן הטוב לשתילה בגינה ולזריעת ירקות חורף ותבלינים.',
-      'חורף (דצמבר–פברואר): מפחיתים השקיה ודישון, מרחיקים צמחי בית מהמזגן ומהתנור.',
-      'אביב: עונת הגדילה — מעבירים עציצים, גוזמים, מתחילים לדשן.',
-      'בשרב: משקים מוקדם בבוקר, לא מרססים עלים בשמש ישירה.',
-    ],
-  },
-]
+function ArticleView({ article, onBack, onOpen }) {
+  const more = ARTICLES.filter(a => a.category === article.category && a.id !== article.id).slice(0, 4)
+  const category = CATEGORIES.find(c => c.id === article.category)
 
-export default function CareGuides({ plants, onOpenPlant }) {
-  const [open, setOpen] = useState(null)
+  useEffect(() => window.scrollTo(0, 0), [article.id])
+
+  return (
+    <div className="space-y-4">
+      <button onClick={onBack} className="text-sm font-bold text-mint-600">→ כל המאמרים</button>
+      <article className="card p-0 overflow-hidden">
+        <div className={`h-36 bg-gradient-to-bl ${article.color} grid place-items-center text-7xl`}>{article.emoji}</div>
+        <div className="p-5 space-y-4">
+          <div>
+            <div className="text-xs font-bold text-mint-600">{category?.emoji} {category?.label} · {article.minutes} דק׳ קריאה</div>
+            <h2 className="text-2xl font-extrabold text-forest mt-1 leading-tight">{article.title}</h2>
+            <p className="text-stone-500 mt-1">{article.subtitle}</p>
+          </div>
+          {article.sections.map((s, i) => (
+            <section key={i} className="space-y-2">
+              {s.h && <h3 className="text-lg font-extrabold text-stone-900">{s.h}</h3>}
+              {s.p && <p className="text-[15px] leading-relaxed text-stone-700">{s.p}</p>}
+              {s.list && (
+                <ul className="space-y-2.5">
+                  {s.list.map((line, j) => (
+                    <li key={j} className="flex gap-3 text-[15px] leading-relaxed text-stone-700">
+                      <span className="mt-2 w-2 h-2 rounded-full bg-mint-500 shrink-0" />
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ))}
+        </div>
+      </article>
+
+      {more.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="font-extrabold text-forest px-1">עוד ב{category?.label}</h3>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
+            {more.map(a => <ArticleCard key={a.id} article={a} onOpen={onOpen} compact />)}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+export default function CareGuides({ plants, onOpenPlant, article: articleProp, onArticle }) {
   const [q, setQ] = useState('')
+  const [category, setCategory] = useState(null)
   const [meter, setMeter] = useState(false)
 
-  const guide = GUIDES.find(g => g.id === open)
-  if (guide) {
-    return (
-      <div className="space-y-4">
-        <button onClick={() => setOpen(null)} className="text-sm font-bold text-mint-600">→ כל המדריכים</button>
-        <div className="card">
-          <div className="text-4xl">{guide.icon}</div>
-          <h2 className="text-2xl font-extrabold text-forest mt-2">{guide.title}</h2>
-          <p className="text-stone-500">{guide.sub}</p>
-          <ul className="mt-4 space-y-3">
-            {guide.body.map((line, i) => (
-              <li key={i} className="flex gap-3 text-[15px] leading-relaxed">
-                <span className="mt-2 w-2 h-2 rounded-full bg-mint-500 shrink-0" />
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    )
-  }
+  const article = articleById(articleProp)
+  if (article) return <ArticleView article={article} onBack={() => onArticle(null)} onOpen={onArticle} />
 
   const term = q.trim()
-  const guides = GUIDES.filter(g => !term || [g.title, g.sub, ...g.body].some(t => t.includes(term)))
+  const matches = a => !term || [a.title, a.subtitle, ...a.sections.flatMap(s => [s.h, s.p, ...(s.list || [])])].some(t => t?.includes(term))
+  const list = ARTICLES.filter(a => (!category || a.category === category) && matches(a))
+  const [featured, ...rest] = list
   const mine = plants.filter(p => !term || p.name.includes(term))
 
   return (
     <div className="space-y-5">
       <label className="flex items-center gap-2 rounded-2xl bg-white border border-stone-200 px-4 py-3">
         <SearchIcon className="w-5 h-5 text-stone-400" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש: השקיה, כנימות, דישון..." className="flex-1 outline-none bg-transparent" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש: השקיה, כנימות, ריחן..." className="flex-1 outline-none bg-transparent" />
       </label>
 
-      {meter && <LightMeter onClose={() => setMeter(false)} />}
-
-      <button onClick={() => setMeter(true)} className="card w-full flex items-center gap-4 text-right bg-gradient-to-l from-amber-50 to-white">
-        <span className="w-14 h-14 rounded-2xl bg-amber-400 grid place-items-center text-3xl shrink-0">☀️</span>
-        <span className="flex-1">
-          <span className="block text-lg font-extrabold text-stone-900">מד אור</span>
-          <span className="block text-sm text-stone-500">מודדים במצלמה כמה אור יש במקום ובודקים אם הוא מתאים לצמח</span>
-        </span>
-      </button>
-
-      <div className="grid grid-cols-2 gap-3">
-        {guides.map(g => (
-          <button key={g.id} onClick={() => setOpen(g.id)} className="card p-4 text-right">
-            <div className="w-12 h-12 rounded-2xl bg-mint-50 grid place-items-center text-2xl">{g.icon}</div>
-            <div className="mt-3 font-extrabold text-stone-900">{g.title}</div>
-            <div className="text-xs text-stone-500 mt-0.5">{g.sub}</div>
-          </button>
-        ))}
-      </div>
-
       {mine.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-xl font-extrabold text-forest">המדריכים של הצמחים שלי</h2>
+        <section className="space-y-2">
+          <h2 className="text-xl font-extrabold text-forest">טיפים לצמחים שלי</h2>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4">
             {mine.map(p => (
-              <button key={p.id} onClick={() => onOpenPlant(p.id)} className="shrink-0 w-32 text-right">
-                <img src={plantPhoto(p)} alt="" className="w-32 h-32 rounded-2xl object-cover bg-mint-50" />
-                <div className="mt-1.5 font-bold text-sm truncate">{p.name}</div>
+              <button key={p.id} onClick={() => onOpenPlant(p.id, 'guide')} className="card p-0 overflow-hidden w-44 shrink-0 text-right">
+                <img src={plantPhoto(p)} alt="" className="w-full h-24 object-cover bg-mint-50" />
+                <div className="p-2.5">
+                  <div className="font-extrabold text-sm truncate">{p.name}</div>
+                  <div className="text-xs text-stone-500 mt-0.5 line-clamp-2 min-h-[2rem]">
+                    {p.tips?.data?.headline || 'טיפים אישיים לפי הזן, המיקום והעונה ←'}
+                  </div>
+                </div>
               </button>
             ))}
           </div>
         </section>
       )}
+
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+        <button
+          onClick={() => setCategory(null)}
+          className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-bold ${!category ? 'bg-forest text-white' : 'bg-white text-stone-600 border border-stone-200'}`}
+        >
+          הכול
+        </button>
+        {CATEGORIES.map(c => (
+          <button
+            key={c.id}
+            onClick={() => setCategory(c.id === category ? null : c.id)}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-bold ${category === c.id ? 'bg-forest text-white' : 'bg-white text-stone-600 border border-stone-200'}`}
+          >
+            {c.emoji} {c.label}
+          </button>
+        ))}
+      </div>
+
+      {featured && (
+        <button onClick={() => onArticle(featured.id)} className="card p-0 overflow-hidden w-full text-right">
+          <div className={`h-40 bg-gradient-to-bl ${featured.color} grid place-items-center text-7xl`}>{featured.emoji}</div>
+          <div className="p-4">
+            <div className="text-xs font-bold text-mint-600">{CATEGORIES.find(c => c.id === featured.category)?.label} · {featured.minutes} דק׳ קריאה</div>
+            <div className="text-xl font-extrabold text-stone-900 mt-1">{featured.title}</div>
+            <div className="text-sm text-stone-500 mt-0.5">{featured.subtitle}</div>
+          </div>
+        </button>
+      )}
+
+      {!category && !term && (
+        <>
+          {meter && <LightMeter onClose={() => setMeter(false)} />}
+          <button onClick={() => setMeter(true)} className="card w-full flex items-center gap-4 text-right bg-gradient-to-l from-amber-50 to-white">
+            <span className="w-14 h-14 rounded-2xl bg-amber-400 grid place-items-center text-3xl shrink-0">☀️</span>
+            <span className="flex-1">
+              <span className="block text-lg font-extrabold text-stone-900">מד אור</span>
+              <span className="block text-sm text-stone-500">מודדים במצלמה כמה אור יש במקום ובודקים אם הוא מתאים לצמח</span>
+            </span>
+          </button>
+        </>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        {rest.map(a => <ArticleCard key={a.id} article={a} onOpen={onArticle} />)}
+      </div>
+
+      {!list.length && <p className="text-center text-sm text-stone-500 py-6">לא מצאנו מאמר על "{term}". נסו לשאול את המומחה בצ׳אט 💬</p>}
     </div>
   )
 }

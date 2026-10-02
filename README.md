@@ -21,8 +21,11 @@ A mobile-first web app (PWA, Hebrew/RTL) for growing plants at home, on the balc
 - **Light meter**: measures light with the phone camera (lux from the camera's exposure where the
   browser reports it, otherwise a rough estimate) and says whether the spot suits the plant.
 - **Plant journal**: a timeline of waterings, feedings, notes, progress photos and health scans.
-- **Care guide**: general guides (watering, light, fertilizing, pests, repotting, Israeli seasons)
-  plus each saved plant's own guide.
+- **Care guide library**: 19 articles in 7 categories (basics, problems and pests, seasons,
+  propagation, houseplants, balcony and garden, herbs), with search and a tip of the day.
+- **Personal tips per plant**: tips written for each saved plant from its species, spot, season,
+  latest scan and care history, with common mistakes, a fun fact and recommended articles;
+  cached on the plant and refreshed when the season changes, after a new scan or monthly.
 
 Identification and diagnosis use Claude (vision) on the server. The plant collection
 lives in the browser's localStorage and, when signed in, is synced to the cloud.
@@ -63,6 +66,7 @@ Optional environment variables:
 | `SIGNUP_CODE` | none | If set, creating an account requires this code (keeps strangers out). |
 | `DAILY_SCANS_PER_USER` | 40 | Scans per user per day. |
 | `DAILY_CHATS_PER_USER` | 150 | Chat messages per user per day. |
+| `DAILY_TIPS_PER_USER` | 30 | Personal tip refreshes per user per day. |
 | `DAILY_AI_LIMIT` | 600 | Scans + chat messages for the whole app per day. |
 
 ## Structure
@@ -72,6 +76,7 @@ Optional environment variables:
 | `api/_lib/diagnose-core.js` | Claude prompt + JSON schema for the diagnosis |
 | `api/diagnose.js` | Vercel function `POST /api/diagnose` |
 | `api/_lib/chat-core.js`, `api/chat.js` | Plant-expert chat prompt and streaming `POST /api/chat` |
+| `api/_lib/tips-core.js`, `api/tips.js` | Personalized tips for one plant, `POST /api/tips` |
 | `api/_lib/store.js` | Redis connection, accounts, sessions and daily AI quotas |
 | `api/auth.js`, `api/sync.js` | Sign up / sign in / sign out, and cloud copy of the plant collection |
 | `server.js` | Local Express server for `/api` |
@@ -81,7 +86,8 @@ Optional environment variables:
 | `src/components/PlantList.jsx` | My plants: plant cards, sites view, add button |
 | `src/components/PlantDetail.jsx` | Plant page: care schedule, journal, health, guide |
 | `src/components/Reminders.jsx` | Task board and notification toggle |
-| `src/components/CareGuides.jsx` | General care guides |
+| `src/components/CareGuides.jsx`, `src/lib/articles.js` | Article library and reader |
+| `src/components/PlantTips.jsx`, `src/lib/tips.js` | Personal tips on the plant page |
 | `src/components/Chat.jsx` | Plant-expert chat screen |
 | `src/components/Account.jsx`, `src/lib/cloud.js`, `src/lib/useCloudSync.js` | Account screen and background sync |
 | `src/components/LightMeter.jsx` | Camera light meter |
