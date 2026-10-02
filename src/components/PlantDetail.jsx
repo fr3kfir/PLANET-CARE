@@ -5,6 +5,8 @@ import { formatDate, formatShortDate } from '../lib/labels.js'
 import { SEASON_LABEL, TASKS, applySeasonPlan, completeTask, currentSeason, dueLabel, newId, plantPhoto, taskStatus } from '../lib/storage.js'
 import LightMeter, { LIGHT_LEVELS } from './LightMeter.jsx'
 import PlantTips from './PlantTips.jsx'
+import { IS_ARTIFACT } from '../lib/platform.js'
+import { askConfirm, notify } from './Dialogs.jsx'
 import { downloadTaskIcs } from '../lib/reminders.js'
 import { resizeImage, thumbnailFromDataUrl } from '../lib/image.js'
 
@@ -130,7 +132,7 @@ function LightCard({ plant, onMeasure }) {
         <div className="font-extrabold text-stone-900">אור{need && `: ${need.label}`}</div>
         <div className="text-sm text-stone-500 line-clamp-2">{need?.hint || care?.light || 'בדקו אם המקום מואר מספיק'}</div>
       </div>
-      <button onClick={onMeasure} className="shrink-0 rounded-2xl bg-amber-400 text-stone-900 font-bold px-3 py-2 text-sm">מד אור</button>
+      {onMeasure && <button onClick={onMeasure} className="shrink-0 rounded-2xl bg-amber-400 text-stone-900 font-bold px-3 py-2 text-sm">מד אור</button>}
     </div>
   )
 }
@@ -160,7 +162,7 @@ function Journal({ plant, onUpdate }) {
       add({ type: 'photo', thumb, text: note.trim() })
       setNote('')
     } catch {
-      alert('לא הצלחנו לקרוא את התמונה.')
+      notify({ title: 'לא הצלחנו לקרוא את התמונה', message: 'נסו תמונה אחרת (JPG או PNG).' })
     } finally {
       setBusy(false)
     }
@@ -252,14 +254,14 @@ export default function PlantDetail({ plant, onBack, onUpdate, onDelete, onResca
           ))}
           <AddTask plant={plant} onUpdate={onUpdate} />
           {care?.water && <p className="text-sm text-stone-500 px-1">💡 {care.water}</p>}
-          <LightCard plant={plant} onMeasure={() => setMeter(true)} />
+          <LightCard plant={plant} onMeasure={IS_ARTIFACT ? null : () => setMeter(true)} />
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-ghost" onClick={onRescan}><CameraIcon className="w-5 h-5" /> סריקה חדשה</button>
             <button className="btn-ghost" onClick={onAsk}>💬 לשאול את המומחה</button>
           </div>
           <button
             className="w-full text-sm text-red-600 py-3"
-            onClick={() => confirm(`למחוק את "${plant.name}" מהאוסף?`) && onDelete()}
+            onClick={async () => (await askConfirm({ title: `למחוק את "${plant.name}"?`, message: 'הצמח, היומן וההיסטוריה שלו יימחקו.', confirmText: 'מחיקה', danger: true })) && onDelete()}
           >
             🗑️ מחיקת הצמח
           </button>

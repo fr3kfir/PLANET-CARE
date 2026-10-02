@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BellIcon, CheckIcon } from './Icons.jsx'
 import { tipOfTheDay } from '../lib/articles.js'
+import { IS_ARTIFACT } from '../lib/platform.js'
 import { TASKS, allTasks, dueLabel, plantPhoto } from '../lib/storage.js'
 import {
   loadReminderSettings, notificationsSupported, requestNotifications, saveReminderSettings,
@@ -141,7 +142,7 @@ export default function Reminders({ plants, onComplete, onOpen, onScan, onOpenAr
         </section>
       )}
 
-      <NotificationsCard />
+      {!IS_ARTIFACT && <NotificationsCard />}
 
       {justDone && (
         <div className="fixed z-30 inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+92px)] flex justify-center pointer-events-none">

@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchAccount, mergePlants, pullPlants, pushChanges, signIn, signOut } from './cloud.js'
+import { fetchAccount, mergePlants, pullPlants as pullCloud, pushChanges as pushCloud, signIn, signOut } from './cloud.js'
+import { IS_ARTIFACT } from './platform.js'
+import { artifactStorage, pullArtifactPlants, pushArtifactChanges } from './artifactStore.js'
+
+// The website syncs to its own server per account; the claude.ai build syncs to the
+// artifact's database under the viewer's Claude identity.
+const pullPlants = IS_ARTIFACT ? pullArtifactPlants : pullCloud
+const pushChanges = IS_ARTIFACT ? pushArtifactChanges : pushCloud
 
 // Keeps the plant collection in sync with the signed-in account.
 // localStorage stays the working copy; changes are pushed to the cloud shortly after they happen.
@@ -12,7 +19,14 @@ export function useCloudSync(plants, setPlants) {
   const timer = useRef(null)
   plantsRef.current = plants
 
+  const [artifactReady, setArtifactReady] = useState(false)
+
   useEffect(() => {
+    if (IS_ARTIFACT) {
+      setAccount({ loading: false, cloud: false, user: null })
+      artifactStorage().then(s => setArtifactReady(!!s))
+      return
+    }
     fetchAccount()
       .then(a => setAccount({ ...a, loading: false }))
       .catch(() => setAccount({ loading: false, cloud: false, user: null, offline: true }))
@@ -38,7 +52,7 @@ export function useCloudSync(plants, setPlants) {
   }, [])
 
   // Signed in: pull the cloud copy, merge it with this device, upload what the cloud is missing.
-  const email = account.user?.email
+  const email = IS_ARTIFACT ? (artifactReady ? 'claude' : null) : account.user?.email
   useEffect(() => {
     if (!email) {
       baseline.current = null

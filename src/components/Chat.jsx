@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { chatStream } from '../lib/api.js'
 import { resizeImage } from '../lib/image.js'
 import { newId } from '../lib/storage.js'
+import { askConfirm } from './Dialogs.jsx'
 
 const KEY = 'plant-care:chat:v1'
 const SUGGESTIONS = [
@@ -162,8 +163,8 @@ export default function Chat({ plants, draft = '', onDraftUsed }) {
     }
   }
 
-  const clear = () => {
-    if (!confirm('למחוק את כל השיחה?')) return
+  const clear = async () => {
+    if (!(await askConfirm({ title: 'להתחיל שיחה חדשה?', message: 'השיחה הנוכחית תימחק.', confirmText: 'מחיקה', danger: true }))) return
     abortRef.current?.abort()
     setMessages([])
     saveChat([])

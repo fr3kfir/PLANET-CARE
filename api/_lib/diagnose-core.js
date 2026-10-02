@@ -4,113 +4,8 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { MISSING_KEY_ERROR, anthropicClient } from './anthropic-key.js';
+import { DIAGNOSIS_PROMPT, DIAGNOSIS_SCHEMA, diagnosisContext } from '../../src/lib/prompts.js';
 
-const ISSUE_CATEGORIES = [
-  'light_low', 'light_high', 'overwatering', 'underwatering', 'soil_drainage',
-  'pests', 'disease', 'nutrients', 'temperature', 'humidity', 'pot_roots', 'other',
-];
-
-const DIAGNOSIS_SCHEMA = {
-  type: 'object',
-  properties: {
-    is_plant: { type: 'boolean', description: 'false if the photo does not show a plant' },
-    identification: {
-      type: 'object',
-      properties: {
-        common_name_he: { type: 'string' },
-        common_name_en: { type: 'string' },
-        scientific_name: { type: 'string' },
-        family: { type: 'string' },
-        confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
-        alternatives: { type: 'array', items: { type: 'string' }, description: 'Other likely species if unsure (Hebrew + scientific)' },
-        description: { type: 'string', description: '1-2 sentences about the plant' },
-      },
-      required: ['common_name_he', 'common_name_en', 'scientific_name', 'family', 'confidence', 'alternatives', 'description'],
-      additionalProperties: false,
-    },
-    health: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', enum: ['healthy', 'needs_attention', 'critical'] },
-        score: { type: 'integer', description: 'Overall health 0-100' },
-        summary: { type: 'string' },
-      },
-      required: ['status', 'score', 'summary'],
-      additionalProperties: false,
-    },
-    issues: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          category: { type: 'string', enum: ISSUE_CATEGORIES },
-          title: { type: 'string' },
-          severity: { type: 'string', enum: ['low', 'medium', 'high'] },
-          evidence: { type: 'string', description: 'What in the photo indicates this' },
-          treatment: { type: 'array', items: { type: 'string' }, description: 'Concrete ordered steps' },
-        },
-        required: ['category', 'title', 'severity', 'evidence', 'treatment'],
-        additionalProperties: false,
-      },
-    },
-    care: {
-      type: 'object',
-      properties: {
-        light: { type: 'string' },
-        water: { type: 'string' },
-        water_every_days: { type: 'integer', description: 'Typical days between waterings in the current season in Israel' },
-        fertilize_every_days: { type: 'integer', description: 'Typical days between feedings in the current season in Israel; 0 if the plant should not be fed now' },
-        mist_every_days: { type: 'integer', description: 'Days between misting/leaf spraying now; 0 if the plant does not need misting' },
-        prune_every_days: { type: 'integer', description: 'Days between light pruning/tidying (dead leaves, leggy stems); 0 if not needed' },
-        repot_every_days: { type: 'integer', description: 'Days between repotting or refreshing soil (e.g. 365-730); 0 for in-ground garden plants' },
-        light_level: { type: 'string', enum: ['low', 'medium', 'bright_indirect', 'direct'], description: 'Light the plant needs: low (shade), medium, bright indirect, or direct sun' },
-        seasonal_plan: {
-          type: 'object',
-          description: 'Care intervals in days for the Israeli warm season (Apr-Oct) and cool season (Nov-Mar), for the given location; 0 means skip',
-          properties: Object.fromEntries(['warm', 'cool'].map(season => [season, {
-            type: 'object',
-            properties: {
-              water_every_days: { type: 'integer' },
-              fertilize_every_days: { type: 'integer' },
-              mist_every_days: { type: 'integer' },
-            },
-            required: ['water_every_days', 'fertilize_every_days', 'mist_every_days'],
-            additionalProperties: false,
-          }])),
-          required: ['warm', 'cool'],
-          additionalProperties: false,
-        },
-        soil: { type: 'string' },
-        humidity: { type: 'string' },
-        temperature: { type: 'string' },
-        fertilizer: { type: 'string' },
-        repotting: { type: 'string' },
-        pet_toxicity: { type: 'string' },
-        best_location: { type: 'string' },
-      },
-      required: ['light', 'water', 'water_every_days', 'fertilize_every_days', 'mist_every_days', 'prune_every_days', 'repot_every_days', 'light_level', 'seasonal_plan', 'soil', 'humidity', 'temperature', 'fertilizer', 'repotting', 'pet_toxicity', 'best_location'],
-      additionalProperties: false,
-    },
-    tips: { type: 'array', items: { type: 'string' } },
-    photo_quality_note: { type: 'string', description: 'Empty string, or advice for a better photo if the diagnosis was limited' },
-  },
-  required: ['is_plant', 'identification', 'health', 'issues', 'care', 'tips', 'photo_quality_note'],
-  additionalProperties: false,
-};
-
-const SYSTEM_PROMPT = `You are an experienced horticulturist and plant pathologist helping a home gardener in Israel grow healthy plants (houseplants, balcony, garden, herbs, vegetables and fruit trees).
-
-From the photo, identify the plant species and assess its health. Look carefully at leaf color and texture, spots, edges, curling, wilting, stem condition, new growth, soil surface, pot/drainage, and signs of pests (aphids, mealybugs, spider mites, scale, whitefly, thrips, fungus gnats) or disease (fungal, bacterial, root rot, powdery mildew).
-
-Rules:
-- Write every human-readable field in Hebrew (scientific names in Latin; common_name_en in English).
-- Only report issues you can actually see evidence for in the photo or that the user's notes describe. A healthy plant should get an empty issues list — do not invent problems.
-- Treatment steps must be practical and specific for a home grower (amounts, frequency, what to buy), preferring gentle/organic options first.
-- Care guidance should fit the Israeli climate and the current season, and the location the user gave (indoor/balcony/garden).
-- If you are unsure of the species, say so via confidence and alternatives rather than guessing confidently.
-- If the photo is not a plant, set is_plant=false and fill the other fields with brief placeholders.`;
-
-const LOCATION_LABELS = { indoor: 'בתוך הבית', balcony: 'מרפסת', garden: 'גינה' };
 const ALLOWED_MEDIA = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 // Streams the request (long vision answers can take a while) and asks the API to retry
@@ -133,18 +28,12 @@ export async function createWithFallback(anthropic, params) {
 export async function diagnosePlant({ image, mediaType, location, notes, knownSpecies }) {
   const anthropic = anthropicClient();
 
-  const month = new Date().toLocaleString('en-US', { month: 'long', timeZone: 'Asia/Jerusalem' });
-  const context = [
-    `Current month: ${month}.`,
-    location && LOCATION_LABELS[location] ? `Where the plant grows: ${LOCATION_LABELS[location]} (${location}).` : null,
-    knownSpecies ? `Previously identified as: ${knownSpecies}.` : null,
-    notes ? `Notes from the grower: ${notes}` : null,
-  ].filter(Boolean).join('\n');
+  const context = diagnosisContext({ location, notes, knownSpecies });
 
   const params = {
     model: 'claude-opus-5-5',
     max_tokens: 16000,
-    system: SYSTEM_PROMPT,
+    system: DIAGNOSIS_PROMPT,
     messages: [{
       role: 'user',
       content: [

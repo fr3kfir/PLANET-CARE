@@ -3,40 +3,11 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropicClient } from './anthropic-key.js';
+import { CHAT_PROMPT, collectionContext } from '../../src/lib/prompts.js';
 
-const SYSTEM_PROMPT = `You are "המומחה לצמחים", a warm, practical plant expert inside a Hebrew plant-care app for home growers in Israel. You know houseplants, balcony and garden plants, herbs, vegetables, fruit trees, succulents, lawns, propagation, pests and diseases, soil and fertilizers, irrigation, garden design and the Israeli climate and seasons.
-
-How to answer:
-- Always reply in Hebrew (Latin only for scientific names), in a friendly, conversational tone.
-- Be concrete and actionable: amounts, frequencies, timing for the current season in Israel, what to buy and where it goes. Prefer gentle/organic solutions first.
-- Keep answers short and scannable for a phone screen: a direct answer first, then a few bullets or numbered steps only when they help. Use **bold** sparingly for key words. No headings or tables.
-- When the user shares a photo, look closely (leaf color, spots, edges, pests, soil, pot) and say what you see before advising. If a better photo would help, say exactly what to shoot.
-- Use the user's plant collection below when relevant (refer to their plants by name), but don't recite it unprompted.
-- If you're unsure, say so and suggest how to check. Flag pet or child toxicity when it matters.
-- Stay on plants, gardening, growing food and closely related topics. If asked about something unrelated, say briefly and kindly that you can only help with plants and offer a plant-related angle.`;
-
-const LOCATION_LABELS = { indoor: 'בתוך הבית', balcony: 'מרפסת', garden: 'גינה' };
 const ALLOWED_MEDIA = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_MESSAGES = 30;
 const MAX_IMAGES = 4;
-
-function collectionContext(plants) {
-  const now = new Date();
-  const date = now.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jerusalem' });
-  const lines = (Array.isArray(plants) ? plants : []).slice(0, 40).map(p => {
-    const parts = [
-      `- ${String(p.name || '').slice(0, 60)}`,
-      p.scientific ? `(${String(p.scientific).slice(0, 80)})` : '',
-      p.site ? `· מיקום: ${String(p.site).slice(0, 40)}` : '',
-      p.location && LOCATION_LABELS[p.location] ? `· ${LOCATION_LABELS[p.location]}` : '',
-      p.waterEveryDays ? `· השקיה כל ${Number(p.waterEveryDays)} ימים` : '',
-      p.lastWatered ? `· הושקה לאחרונה ${String(p.lastWatered).slice(0, 10)}` : '',
-      p.health ? `· מצב בסריקה אחרונה: ${String(p.health).slice(0, 160)}` : '',
-    ];
-    return parts.filter(Boolean).join(' ');
-  });
-  return `Today's date: ${date} (Israel).\n\nThe user's plant collection:\n${lines.length ? lines.join('\n') : '(no plants saved yet)'}`;
-}
 
 // Client sends [{ role: 'user'|'assistant', text, image?: { data, mediaType } }].
 // Only the most recent photos are forwarded, to keep requests small.
@@ -81,7 +52,7 @@ export async function streamChat({ messages, plants }, write) {
     model: 'claude-opus-5-5',
     max_tokens: 16000,
     system: [
-      { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: CHAT_PROMPT, cache_control: { type: 'ephemeral' } },
       { type: 'text', text: collectionContext(plants) },
     ],
     messages: toApiMessages(messages),

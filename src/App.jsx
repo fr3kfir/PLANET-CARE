@@ -6,10 +6,13 @@ import Reminders from './components/Reminders.jsx'
 import CareGuides from './components/CareGuides.jsx'
 import Chat from './components/Chat.jsx'
 import AccountSheet, { LoginPrompt } from './components/Account.jsx'
+import { DialogHost } from './components/Dialogs.jsx'
 import { BookIcon, ChatIcon, ClockIcon, KitIcon, LeafIcon, SearchIcon } from './components/Icons.jsx'
 import { allTasks, completeTask, loadPlants, savePlants } from './lib/storage.js'
 import { notifyDueTasks } from './lib/reminders.js'
 import { useCloudSync } from './lib/useCloudSync.js'
+import { IS_ARTIFACT } from './lib/platform.js'
+import appIcon from './icon.svg'
 
 const TABS = [
   { id: 'reminders', label: 'תזכורות', Icon: ClockIcon, title: 'תזכורות', sub: 'מה הצמחים צריכים היום' },
@@ -93,13 +96,13 @@ export default function App() {
               <h1 className="page-title">{rescanPlant ? `סריקת מעקב` : current.title}</h1>
               <p className="page-sub">{rescanPlant ? rescanPlant.name : current.sub}</p>
             </div>
-            <button onClick={() => setAccountOpen(true)} aria-label="החשבון שלי" className="relative mt-1 shrink-0">
+            <button onClick={() => !IS_ARTIFACT && setAccountOpen(true)} aria-label="החשבון שלי" className="relative mt-1 shrink-0">
               {account.user ? (
                 <span className="w-11 h-11 rounded-full bg-mint-500 text-white grid place-items-center text-lg font-extrabold shadow">
                   {account.user.email[0].toUpperCase()}
                 </span>
               ) : (
-                <img src="/icon.svg" alt="" className="w-11 h-11" />
+                <img src={appIcon} alt="" className="w-11 h-11" />
               )}
               {account.user && (
                 <span className={`absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full ring-2 ring-white ${syncStatus === 'error' ? 'bg-amber-400' : syncStatus === 'syncing' ? 'bg-sky-400 animate-pulse' : 'bg-mint-500'}`} />
@@ -180,6 +183,8 @@ export default function App() {
           />
         )}
       </main>
+
+      <DialogHost />
 
       {accountOpen && (
         <AccountSheet

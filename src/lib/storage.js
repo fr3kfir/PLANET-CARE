@@ -44,7 +44,7 @@ export function scheduleFromCare(care) {
 }
 
 // Fill in fields added after v1 so older saved plants keep working.
-function normalize(p) {
+export function normalize(p) {
   const care = p.scans?.[0]?.result?.care;
   const plant = {
     ...p,

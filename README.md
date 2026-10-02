@@ -94,8 +94,15 @@ Optional environment variables:
 | `src/lib/storage.js` | Plant storage, care tasks and due dates |
 | `src/lib/reminders.js` | Notifications and calendar (.ics) reminders |
 
-## Claude artifact version
+## Claude artifact version (no API key)
 
-`claude-artifact/index.html` is a single-file version that runs as a claude.ai artifact:
-it asks Claude through the viewer's own account (no API key needed) and keeps each
-person's plants in the artifact's private per-user storage.
+`claude-artifact/index.html` is the whole app built as one file for claude.ai
+(https://claude.ai/artifact/GMj5wRpnrZxTnYNNgrycT1). It runs on the viewer's own Claude account:
+scans, tips and chat go through the artifact `sample` capability (same prompts as the server,
+`src/lib/prompts.js`), and plants are saved in the artifact database under the viewer's private
+`data/users/<id>/` path. Differences from the website: photos come from the phone's camera app or
+gallery (the artifact frame blocks the live camera, so there is no light meter), calendar reminders
+are saved through the `downloads` capability, and there are no accounts (Claude is the account).
+
+Rebuild with `node scripts/build-artifact.mjs`, then republish that file to the artifact with
+capabilities `sample`, `db`, `user` and `downloads`.

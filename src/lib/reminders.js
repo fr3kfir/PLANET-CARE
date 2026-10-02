@@ -1,6 +1,7 @@
 // Reminders without a push server: a calendar event (.ics) per care task, which the
 // phone's calendar then alerts on, plus a summary notification when the app opens.
 import { TASKS, allTasks } from './storage.js';
+import { IS_ARTIFACT, capability } from './platform.js';
 
 const SETTINGS_KEY = 'plant-care:reminders:v1';
 
@@ -78,10 +79,16 @@ export function downloadTaskIcs(plant, type, hour = loadReminderSettings().hour)
     'END:VCALENDAR',
   ].join('\r\n');
 
+  const filename = `${type}-${plant.name}.ics`;
+  if (IS_ARTIFACT) {
+    // The artifact viewer blocks page-started downloads; it offers the file through `downloads`.
+    capability('downloads').then(d => d?.save({ filename, data: ics })).catch(() => {});
+    return;
+  }
   const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${type}-${plant.name}.ics`;
+  a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }

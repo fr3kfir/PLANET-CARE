@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LOCATIONS } from '../lib/labels.js'
 import { resizeImage } from '../lib/image.js'
+import { IS_ARTIFACT } from '../lib/platform.js'
 
 // Full-screen live camera with a scan frame, in the style of plant ID apps.
 // Falls back to the system camera / gallery picker when live video isn't available.
@@ -19,6 +20,8 @@ export default function CameraScanner({ mode, location, onLocation, notes, onNot
     let stream
     let cancelled = false
     ;(async () => {
+      // claude.ai artifacts can't use the live camera: take the photo with the phone's camera app.
+      if (IS_ARTIFACT) return setFailed('לחצו על כפתור הצילום למטה כדי לצלם את הצמח עם המצלמה של הטלפון, או בחרו תמונה מהגלריה.')
       if (!navigator.mediaDevices?.getUserMedia) return setFailed('הדפדפן לא תומך במצלמה חיה.')
       try {
         stream = await navigator.mediaDevices.getUserMedia({

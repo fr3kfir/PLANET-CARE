@@ -4,6 +4,7 @@ import LightMeter from './LightMeter.jsx'
 import { ArticleCard } from './PlantTips.jsx'
 import { ARTICLES, CATEGORIES, articleById } from '../lib/articles.js'
 import { plantPhoto } from '../lib/storage.js'
+import { IS_ARTIFACT } from '../lib/platform.js'
 
 function ArticleView({ article, onBack, onOpen }) {
   const more = ARTICLES.filter(a => a.category === article.category && a.id !== article.id).slice(0, 4)
@@ -122,7 +123,7 @@ export default function CareGuides({ plants, onOpenPlant, article: articleProp, 
         </button>
       )}
 
-      {!category && !term && (
+      {!category && !term && !IS_ARTIFACT && (
         <>
           {meter && <LightMeter onClose={() => setMeter(false)} />}
           <button onClick={() => setMeter(true)} className="card w-full flex items-center gap-4 text-right bg-gradient-to-l from-amber-50 to-white">

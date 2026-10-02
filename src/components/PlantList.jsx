@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CanIcon, DotsIcon, PinIcon, PlusPlantIcon } from './Icons.jsx'
+import { askConfirm, askText } from './Dialogs.jsx'
 import { TASKS, allTasks, plantPhoto, taskStatus } from '../lib/storage.js'
 
 export function WaterBadge({ plant }) {
@@ -21,16 +22,16 @@ function PlantMenu({ plant, onUpdate, onDelete, onClose }) {
     <>
       <div className="fixed inset-0 z-20" onClick={e => { e.stopPropagation(); onClose() }} />
       <div className="absolute top-10 left-3 z-30 w-44 rounded-2xl bg-white shadow-xl border border-stone-100 py-1 text-sm text-right">
-        <button className="block w-full px-4 py-2.5 hover:bg-mint-50 text-right" onClick={act(() => {
-          const name = prompt('שם חדש לצמח:', plant.name)
-          if (name?.trim()) onUpdate(p => ({ ...p, name: name.trim() }))
+        <button className="block w-full px-4 py-2.5 hover:bg-mint-50 text-right" onClick={act(async () => {
+          const name = await askText({ title: 'שם חדש לצמח', value: plant.name })
+          if (name) onUpdate(p => ({ ...p, name }))
         })}>✏️ שינוי שם</button>
-        <button className="block w-full px-4 py-2.5 hover:bg-mint-50 text-right" onClick={act(() => {
-          const site = prompt('איפה הצמח נמצא? (למשל: סלון, מרפסת, חצר)', plant.site)
-          if (site?.trim()) onUpdate(p => ({ ...p, site: site.trim() }))
+        <button className="block w-full px-4 py-2.5 hover:bg-mint-50 text-right" onClick={act(async () => {
+          const site = await askText({ title: 'איפה הצמח נמצא?', placeholder: 'למשל: סלון, מרפסת, חצר', value: plant.site })
+          if (site) onUpdate(p => ({ ...p, site }))
         })}>📍 שינוי מיקום</button>
-        <button className="block w-full px-4 py-2.5 hover:bg-red-50 text-red-600 text-right" onClick={act(() => {
-          if (confirm(`למחוק את "${plant.name}" מהאוסף?`)) onDelete()
+        <button className="block w-full px-4 py-2.5 hover:bg-red-50 text-red-600 text-right" onClick={act(async () => {
+          if (await askConfirm({ title: `למחוק את "${plant.name}"?`, message: 'הצמח, היומן וההיסטוריה שלו יימחקו.', confirmText: 'מחיקה', danger: true })) onDelete()
         })}>🗑️ מחיקה</button>
       </div>
     </>
