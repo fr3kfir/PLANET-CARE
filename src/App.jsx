@@ -25,7 +25,7 @@ const TABS = [
 
 export default function App() {
   const [plants, setPlants] = useState(loadPlants)
-  const [tab, setTab] = useState(plants.length ? 'plants' : 'identify')
+  const [tab, setTab] = useState('plants')
   const [openId, setOpenId] = useState(null)
   const [rescanId, setRescanId] = useState(null)
   const [storageError, setStorageError] = useState(false)
