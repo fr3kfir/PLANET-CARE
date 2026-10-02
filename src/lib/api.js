@@ -1,9 +1,10 @@
 import { authHeaders } from './cloud.js';
 import { IS_ARTIFACT } from './platform.js';
 import { chatWithClaude, diagnoseWithClaude, tipsWithClaude } from './claudeAI.js';
+export { canSendImages } from './claudeAI.js';
 
-export async function diagnose({ dataUrl, location, notes, knownSpecies }) {
-  if (IS_ARTIFACT) return diagnoseWithClaude({ dataUrl, location, notes, knownSpecies });
+export async function diagnose({ dataUrl, description, location, notes, knownSpecies }) {
+  if (IS_ARTIFACT) return diagnoseWithClaude({ dataUrl, description, location, notes, knownSpecies });
   const [, mediaType, image] = dataUrl.match(/^data:(image\/[\w+]+);base64,(.*)$/) || [];
   const r = await fetch('/api/diagnose', {
     method: 'POST',

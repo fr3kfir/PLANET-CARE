@@ -1,8 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import ResultView from './ResultView.jsx'
 import CameraScanner from './CameraScanner.jsx'
 import ScanningOverlay from './ScanningOverlay.jsx'
-import { diagnose } from '../lib/api.js'
+import { canSendImages, diagnose } from '../lib/api.js'
+import { IS_ARTIFACT } from '../lib/platform.js'
+import DescribePlant from './DescribePlant.jsx'
+import appIcon from '../icon.svg'
 import { thumbnailFromDataUrl } from '../lib/image.js'
 import { LOCATIONS } from '../lib/labels.js'
 import { currentSeason, newId, scheduleFromCare } from '../lib/storage.js'
@@ -15,13 +18,20 @@ export default function ScanView({ mode = 'diagnose', targetPlant, onSaveNew, on
   const [error, setError] = useState('')
   const [pending, setPending] = useState(null)
   const [result, setResult] = useState(null)
+  // Whether photos can go to Claude here (some claude.ai views can't); null while checking.
+  const [imagesOk, setImagesOk] = useState(IS_ARTIFACT ? null : true)
+  const [description, setDescription] = useState('')
 
-  const analyze = async dataUrl => {
+  useEffect(() => {
+    if (IS_ARTIFACT) canSendImages().then(setImagesOk)
+  }, [])
+
+  const analyze = async (dataUrl, text = description) => {
     setError('')
     setPending(null)
     try {
       const knownSpecies = targetPlant?.scans?.[0]?.result?.identification?.scientific_name
-      setPending(await diagnose({ dataUrl, location, notes, knownSpecies }))
+      setPending(await diagnose({ dataUrl: imagesOk ? dataUrl : null, description: text, location, notes, knownSpecies }))
     } catch (err) {
       setError(err.message || 'שגיאה בחיבור לשרת')
     }
@@ -32,6 +42,16 @@ export default function ScanView({ mode = 'diagnose', targetPlant, onSaveNew, on
     setResult(null)
     setPhase('scanning')
     analyze(dataUrl)
+  }
+
+  // Description-only scan: keep the optional photo for the plant's card, or use the app icon.
+  const onDescribe = ({ description: text, photo: pic }) => {
+    setDescription(text)
+    setNotes(text)
+    setPhoto(pic || appIcon)
+    setResult(null)
+    setPhase('scanning')
+    analyze(null, text)
   }
 
   const onFinished = useCallback(() => {
@@ -81,7 +101,13 @@ export default function ScanView({ mode = 'diagnose', targetPlant, onSaveNew, on
         </div>
       )}
 
-      {phase === 'camera' && (
+      {phase === 'camera' && imagesOk === false && (
+        <DescribePlant mode={mode} location={location} onLocation={setLocation} onSubmit={onDescribe} />
+      )}
+
+      {phase === 'camera' && imagesOk === null && <p className="text-center text-sm text-stone-500 py-10">מתחבר ל-Claude…</p>}
+
+      {phase === 'camera' && imagesOk && (
         <CameraScanner
           mode={mode}
           location={location}

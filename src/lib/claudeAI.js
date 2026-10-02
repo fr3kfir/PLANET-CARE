@@ -77,11 +77,25 @@ function normalizeDiagnosis(r) {
   }
 }
 
-export async function diagnoseWithClaude({ dataUrl, location, notes, knownSpecies }) {
-  const sample = await getSample()
-  const prompt = `${DIAGNOSIS_PROMPT}\n\n${diagnosisContext({ location, notes, knownSpecies })}\n\nThe attached photo shows the plant. Identify this plant and diagnose its health.\n\n${jsonInstruction(DIAGNOSIS_SCHEMA)}`
+// Some Claude views can't send images to Claude; the app then asks for a description instead.
+export async function canSendImages() {
+  const sample = await capability('sample')
+  if (!sample) return false
   try {
-    const result = await sample.json(prompt, { images: dataUrlToBlob(dataUrl), cache: false })
+    return !!(await sample.limits())?.images
+  } catch {
+    return false
+  }
+}
+
+export async function diagnoseWithClaude({ dataUrl, description, location, notes, knownSpecies }) {
+  const sample = await getSample()
+  const subject = dataUrl
+    ? 'The attached photo shows the plant. Identify this plant and diagnose its health.'
+    : `No photo could be sent. Identify the plant and assess its health from the grower's description below; set confidence to reflect that it is based on a description, and use photo_quality_note to say a photo would make the diagnosis more reliable.\n\nGrower's description:\n${String(description || '').slice(0, 2000)}`
+  const prompt = `${DIAGNOSIS_PROMPT}\n\n${diagnosisContext({ location, notes, knownSpecies })}\n\n${subject}\n\n${jsonInstruction(DIAGNOSIS_SCHEMA)}`
+  try {
+    const result = await sample.json(prompt, { ...(dataUrl ? { images: dataUrlToBlob(dataUrl) } : {}), cache: false })
     return normalizeDiagnosis(result)
   } catch (e) {
     throw failure(e)
