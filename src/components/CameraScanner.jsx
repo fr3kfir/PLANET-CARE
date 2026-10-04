@@ -20,9 +20,9 @@ export default function CameraScanner({ mode, location, onLocation, notes, onNot
     let stream
     let cancelled = false
     ;(async () => {
-      // claude.ai artifacts can't use the live camera: take the photo with the phone's camera app.
-      if (IS_ARTIFACT) return setFailed('לחצו על כפתור הצילום למטה כדי לצלם את הצמח עם המצלמה של הטלפון, או בחרו תמונה מהגלריה.')
-      if (!navigator.mediaDevices?.getUserMedia) return setFailed('הדפדפן לא תומך במצלמה חיה.')
+      // claude.ai may block the live camera in its frame; then the photo comes from the phone's camera app.
+      const artifactHint = 'לחצו על כפתור הצילום למטה כדי לצלם את הצמח עם המצלמה של הטלפון, או בחרו תמונה מהגלריה.'
+      if (!navigator.mediaDevices?.getUserMedia) return setFailed(IS_ARTIFACT ? artifactHint : 'הדפדפן לא תומך במצלמה חיה.')
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } },
@@ -36,6 +36,7 @@ export default function CameraScanner({ mode, location, onLocation, notes, onNot
         if (trackRef.current.getCapabilities?.().torch) setTorch(false)
         setReady(true)
       } catch (e) {
+        if (IS_ARTIFACT) return setFailed(artifactHint)
         setFailed(e?.name === 'NotAllowedError' ? 'אין הרשאה למצלמה. אפשר לאשר בהגדרות הדפדפן, או לצלם דרך מצלמת הטלפון.' : 'לא הצלחנו לפתוח את המצלמה.')
       }
     })()
